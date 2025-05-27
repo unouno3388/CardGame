@@ -1,42 +1,31 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // ³o¬O¸ü¤J³õ´º©Ò»İªº®Ö¤ß©R¦WªÅ¶¡
+using UnityEngine.SceneManagement;
 
 public class MenuManager : MonoBehaviour
 {
-    // ³o­Ó¤èªk¥Î©ó±q¥D¿ï³æ¸õÂà¨ì¹CÀ¸³õ´º (SampleScene)
-    public void StartGame()
-    {
-        Debug.Log("¸ü¤J¹CÀ¸³õ´º...");
-        SceneManager.LoadScene("SampleScene"); // ¸ü¤J¦WºÙ¬° "SampleScene" ªº³õ´º
-    }
     public void StartOnePlayer()
     {
-        Debug.Log("¸ü¤J¹CÀ¸³õ´º...");
-        SceneManager.LoadScene("SampleScene"); // ¸ü¤J¦WºÙ¬° "SampleScene" ªº³õ´º
-        GameManager.Instance.PlayMod = GameManager.playMode.one;
+        Debug.Log("Starting single-player game...");
+        // åœ¨è¼‰å…¥å ´æ™¯å‰è¨­å®šéŠæˆ²æ¨¡å¼
+        GameManager.initialGameMode = GameManager.GameMode.OfflineSinglePlayer;
+        SceneManager.LoadScene("SampleScene"); // è¼‰å…¥åç¨±ç‚º "SampleScene" çš„å ´æ™¯
     }
-    public void StartTwoPlayer() 
+
+    public void StartTwoPlayer()
     {
-        Debug.Log("¸ü¤J¹CÀ¸³õ´º...");
-        SceneManager.LoadScene("SampleScene"); // ¸ü¤J¦WºÙ¬° "SampleScene" ªº³õ´º
+        Debug.Log("Starting two-player (online) game...");
+        // åœ¨è¼‰å…¥å ´æ™¯å‰è¨­å®šéŠæˆ²æ¨¡å¼
+        GameManager.initialGameMode = GameManager.GameMode.OnlineMultiplayer;
+        SceneManager.LoadScene("SampleScene");
     }
-    /*
-    // ³o­Ó¤èªk¥Î©ó±q¹CÀ¸³õ´ºªğ¦^¥D¿ï³æ (Main)
-    public void BackToMainMenu()
-    {
-        Debug.Log("ªğ¦^¥D¿ï³æ...");
-        SceneManager.LoadScene("Main"); // ¸ü¤J¦WºÙ¬° "Main" ªº³õ´º
-    }
-    */
-    // ³o­Ó¤èªk¥Î©ó°h¥X¹CÀ¸
+
     public void QuitGame()
     {
-        Debug.Log("°h¥X¹CÀ¸...");
+        Debug.Log("Quitting game...");
         Application.Quit();
 
-        // ¥H¤U¥N½X¥u¦b Unity ½s¿è¾¹¤¤¹B¦æ®É¥Í®Ä¡A¥Î©ó°±¤î¼½©ñ¼Ò¦¡
-#if UNITY_EDITOR
+        #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
-#endif
+        #endif
     }
 }

@@ -1,44 +1,51 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
+using System.Linq; // Added for Linq usage
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
+    public static GameMode initialGameMode = GameMode.OfflineSinglePlayer; // 預設為單人模式
+
     public int playerHealth = 30;
     public int opponentHealth = 30;
-    public int playerMana = 1;
-    public int maxMana = 1;
-    public int opponentMana = 1; // 新增對手的魔法值
-    public int opponentMaxMana = 1; // 新增對手的最大魔法值
+    public int playerMana = 15;
+    public int maxMana = 15;
+    public int opponentMana = 15;
+    public int opponentMaxMana = 15;
     public bool isPlayerTurn = true;
     public List<Card> playerHand = new List<Card>();
     public List<Card> opponentHand = new List<Card>();
-    public List<Card> playerField = new List<Card>(); // 保留列表，但不會使用
-    public List<Card> opponentField = new List<Card>(); // 保留列表，但不會使用
+    public List<Card> playerField = new List<Card>();
+    public List<Card> opponentField = new List<Card>();
     public List<Card> playerDeck = new List<Card>();
     public List<Card> opponentDeck = new List<Card>();
+
     public UIManager UIManager { get; private set; }
     private AIManager aiManager;
     private WebSocketManager wsManager;
     public WebSocketManager WebSocketManager => wsManager;
     private CardPlayService cardPlayService;
     public CardPlayService CardPlayService => cardPlayService;
-    private bool isOnline = false;
-    public bool IsOnline => isOnline;
-    private bool uiAutoUpdate = true;
 
-    public enum playMode 
+    // 新增：遊戲模式的枚舉
+    public enum GameMode
     {
-        one, two
-    };
-    private playMode play_Mode = playMode.one;
-    public playMode PlayMod 
-    {
-        get { return play_Mode; }
-        set { play_Mode = value; }
+        OfflineSinglePlayer, // 離線單人模式 (對戰AI)
+        OnlineMultiplayer    // 線上雙人模式 (對戰其他玩家)
     }
 
+    private GameMode currentGameMode; // 當前遊戲模式的變數
+    public GameMode CurrentGameMode
+    {
+        get => currentGameMode;
+        //set
+        //{
+        //    currentGameMode = value;
+         //   Debug.Log($"Current game mode set to: {currentGameMode}");
+        //}
+    }
+    private bool uiAutoUpdate = true; // Added for UI update control
     public bool UIAutoUpdate
     {
         get => uiAutoUpdate;
@@ -51,6 +58,7 @@ public class GameManager : MonoBehaviour
             }
         }
     }
+
     void Awake()
     {
         if (Instance == null)
@@ -68,26 +76,82 @@ public class GameManager : MonoBehaviour
         wsManager = GetComponent<WebSocketManager>();
         cardPlayService = gameObject.AddComponent<CardPlayService>();
 
-        if (UIManager == null || aiManager == null || wsManager == null)
+        if (UIManager == null || aiManager == null || wsManager == null || cardPlayService == null)
         {
-            Debug.LogError("GameManager: Missing required components (UIManager, AIManager, or WebSocketManager)!");
+            Debug.LogError("GameManager: Missing required components (UIManager, AIManager, WebSocketManager, or CardPlayService)!");
         }
     }
 
+    // 將 Start 移到這裡，因為 StartGame 會在 MenuManager 中調用
     void Start()
     {
-        InitializeGame();
+        //InitializeGame();
+        StartGame(initialGameMode);
     }
 
+    // 初始化遊戲，準備牌組和抽牌，不涉及模式選擇
     void InitializeGame()
     {
+        playerHealth = 30; // Reset health
+        opponentHealth = 30; // Reset health
+        playerMana = 15; // Reset mana
+        maxMana = 15; // Reset max mana
+        opponentMana = 15; // Reset opponent mana
+        opponentMaxMana = 15; // Reset opponent max mana
+        isPlayerTurn = true;
+
+        playerHand.Clear();
+        opponentHand.Clear();
+        playerField.Clear();
+        opponentField.Clear();
+
         playerDeck = GenerateRandomDeck(30);
         opponentDeck = GenerateRandomDeck(30);
 
         DrawCard(true, 5);
         DrawCard(false, 5);
         UIManager.UpdateUI();
-        Debug.Log($"Game initialized. Player turn: {isPlayerTurn}. PlayerDeck: {playerDeck.Count}, OpponentDeck: {opponentDeck.Count}");
+        Debug.Log($"Game initialized. PlayerDeck: {playerDeck.Count}, OpponentDeck: {opponentDeck.Count}");
+    }
+
+    // 啟動遊戲的統一入口點
+    public void StartGame(GameMode mode)
+    {
+        currentGameMode = mode; // 設定遊戲模式
+        InitializeGame(); // 初始化遊戲狀態（牌組、手牌、生命值等）
+
+        if (currentGameMode == GameMode.OfflineSinglePlayer)
+        {
+            StartOfflineGame();
+        }
+        else if (currentGameMode == GameMode.OnlineMultiplayer)
+        {
+            StartOnlineGame();
+        }
+        else
+        {
+            Debug.LogError("Unsupported game mode!");
+        }
+    }
+
+    // 處理離線單人模式的啟動邏輯
+    private void StartOfflineGame()
+    {
+        Debug.Log("Starting offline single-player game (vs AI).");
+        // AI 在離線模式下初始不進行任何操作，等待玩家結束回合
+        // StartCoroutine(aiManager.PlayAITurn()); // 不在遊戲開始時直接啟動AI回合
+        UIManager.UpdateUI(); // 確保UI在遊戲開始時更新
+    }
+
+    // 處理線上雙人模式的啟動邏輯
+    private void StartOnlineGame()
+    {
+        Debug.Log("Starting online multiplayer game.");
+        // 連接 WebSocket 服務器
+        wsManager.Connect();
+        // 在線模式下，遊戲流程由伺服器控制，初始狀態可能需要等待伺服器通知
+        // 這裡不需要立即啟動AI或發送結束回合，等待伺服器通知
+        UIManager.UpdateUI(); // 確保UI在遊戲開始時更新
     }
 
     List<Card> GenerateRandomDeck(int count)
@@ -104,9 +168,10 @@ public class GameManager : MonoBehaviour
             int attack = effect == "Deal" ? Random.Range(1, 6) : 0;
             int value = effect == "Heal" ? Random.Range(1, 6) : 0;
 
+            // 確保每張卡牌有唯一的ID，以便在線上模式中識別
             deck.Add(new Card
             {
-                id = i,
+                id = i, // Use 'i' for unique ID in this context
                 name = $"{name} {i}",
                 cost = cost,
                 attack = attack,
@@ -117,124 +182,10 @@ public class GameManager : MonoBehaviour
         return deck;
     }
 
-    public void StartGame(bool online)
-    {
-        isOnline = online;
-        if (!isOnline)
-        {
-            Debug.Log("Starting offline game.");
-        }
-        else
-        {
-            Debug.Log("Starting online game.");
-            wsManager.Connect();
-        }
-    }
+    // PlayCard 的邏輯現在主要交由 CardPlayService 處理，GameManager 不再直接包含其邏輯。
+    // PlayCard2 方法已移除。
 
-    public void PlayCard2(Card card, bool isPlayer, GameObject cardObject = null)
-    {
-        if (card == null)
-        {
-            Debug.LogError("PlayCard: Card is null!");
-            return;
-        }
-
-        if (isPlayer && !isPlayerTurn)
-        {
-            Debug.LogWarning("Not player's turn!");
-            return;
-        }
-
-        // 檢查魔法值是否足夠
-        if (isPlayer)
-        {
-            if (playerMana < card.cost)
-            {
-                Debug.LogWarning($"Not enough mana for player! Current: {playerMana}, Required: {card.cost}");
-                return;
-            }
-        }
-        else
-        {
-            if (opponentMana < card.cost)
-            {
-                Debug.LogWarning($"Not enough mana for opponent! Current: {opponentMana}, Required: {card.cost}");
-                return;
-            }
-        }
-
-        if (isPlayer)
-        {
-            
-            playerHand.Remove(card);
-            playerMana -= card.cost; // 減少玩家的魔法值
-            Debug.Log($"Player played {card.name}. Mana before: {playerMana + card.cost}, Mana after: {playerMana}.");
-            if (isOnline)
-            {
-                wsManager.SendPlayCard(card);
-            }
-            UIManager.UpdateUI(); // 立即更新 UI
-            //RemoveCardFromDeck(card, true); // 從玩家的牌組中移除（已註釋）
-            
-        }
-        else
-        {
-            // AI or online opponent card
-            Debug.Log($"Opponent card :{opponentHand.Contains(card)} = {card.name}");
-            if (opponentHand.Contains(card))
-            {
-                Transform sourcePanel = UIManager.opponentHandPanel;
-                Debug.Log($"Opponent card {card.name} found in opponentHandPanel. Source: {sourcePanel.position}");
-                Transform targetPanel = UIManager.opponentFieldPanel;
-                if (targetPanel != UIManager.opponentFieldPanel)
-                {
-                    Debug.LogError($"Invalid targetPanel for opponent card {card.name}! Expected opponentFieldPanel, got {targetPanel.name}");
-                    targetPanel = UIManager.opponentFieldPanel;
-                }
-
-                if (cardObject == null)
-                {
-                    // Find the card object in opponentHandPanel
-                    foreach (Transform child in sourcePanel)
-                    {
-                        CardUI cardUI = child.GetComponent<CardUI>();
-                        if (cardUI != null && cardUI.card == card)
-                        {
-                            cardObject = child.gameObject;
-                            break;
-                        }
-                    }
-                }
-
-                if (cardObject == null)
-                {
-                    Debug.LogWarning($"Card object for {card.name} not found in opponentHandPanel, skipping animation.");
-                    opponentHand.Remove(card);
-                    opponentMana -= card.cost; // 減少對手的魔法值
-                    Debug.Log($"Opponent played {card.name}. Mana before: {opponentMana + card.cost}, Mana after: {opponentMana}.");
-                    //RemoveCardFromDeck(card, false); // 從對手的牌組中移除（已註釋）
-                    card.ApplyCardEffect(isPlayer); // 手動應用效果
-                    UIManager.UpdateUI(); // 確保 UI 更新
-                    CheckGameOver();
-                }
-                else
-                {
-                    opponentHand.Remove(card);
-                    opponentMana -= card.cost; // 減少對手的魔法值
-                    Debug.Log($"Opponent played {card.name}. Mana before: {opponentMana + card.cost}, Mana after: {opponentMana}.");
-                    UIManager.PlayCardWithAnimation(card, false, cardObject, sourcePanel, targetPanel);
-                    //RemoveCardFromDeck(card, false); // 從對手的牌組中移除（已註釋）
-                    Debug.Log($"Opponent played {card.name}. Animation started from opponentHandPanel (Pos: {sourcePanel.position}) to opponentFieldPanel (Pos: {targetPanel.position}).");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"Card {card.name} not found in opponentHand!");
-                return;
-            }
-        }
-    }
-
+    // 玩家結束回合
     public void EndTurn()
     {
         if (!isPlayerTurn)
@@ -245,43 +196,55 @@ public class GameManager : MonoBehaviour
 
         Debug.Log("Player ends turn.");
         isPlayerTurn = false;
-        //maxMana = Mathf.Min(maxMana + 1, 10);
-        playerMana += 2; // 重置玩家的魔法值
-        //if(playerHand.Count<5)
-            DrawCard(true, 1);
 
-        if (!isOnline)
+        // 回合結束時，魔法值和抽牌邏輯
+        maxMana = Mathf.Min(maxMana + 1, 10);
+        playerMana = maxMana; // 重置玩家的魔法值
+        DrawCard(true, 1);
+
+        if (currentGameMode == GameMode.OfflineSinglePlayer)
         {
-            StartCoroutine(aiManager.PlayAITurn());
+            StartCoroutine(aiManager.PlayAITurn()); // 離線模式直接啟動AI回合
         }
-        else
+        else if (currentGameMode == GameMode.OnlineMultiplayer)
         {
-            wsManager.SendEndTurn();
+            wsManager.SendEndTurn(); // 線上模式發送結束回合訊息
         }
 
-        UIManager.UpdateUI(); // 保留回合結束時的更新
+        UIManager.UpdateUI(); // 保留回合結束時的 UI 更新
     }
 
-    public void StartAITurn()
-    {
-        Debug.Log("Starting AI turn.");
-        isPlayerTurn = false;
-        StartCoroutine(aiManager.PlayAITurn());
-    }
-
+    // AI 結束回合 (僅用於離線模式)
     public void EndAITurn()
     {
         Debug.Log("AI ends turn.");
         isPlayerTurn = true;
-        //maxMana = Mathf.Min(maxMana + 1, 10);
-       //playerMana = maxMana; // 重置玩家的魔法值
-        //opponentMaxMana = Mathf.Min(opponentMaxMana + 1, 10); // 增加對手的最大魔法值
-        opponentMana += 2; // 重置對手的魔法值
-        Debug.Log($"Opponent mana reset. Max: {opponentMaxMana}, Current: {opponentMana}");
+
+        // 回合結束時，魔法值和抽牌邏輯
+        opponentMaxMana = Mathf.Min(opponentMaxMana + 1, 10);
+        opponentMana = opponentMaxMana; // 重置對手的魔法值
         DrawCard(false, 1);
+
+        UIManager.UpdateUI(); // 確保 UI 更新
+    }
+
+    // 接收線上對手結束回合訊息 (僅用於線上模式)
+    public void ReceiveEndTurn()
+    {
+        Debug.Log("Received endTurn from opponent (online).");
+        isPlayerTurn = true;
+
+        // 回合結束時，魔法值和抽牌邏輯
+        maxMana = Mathf.Min(maxMana + 1, 10);
+        playerMana = maxMana; // 重置玩家的魔法值
+        opponentMaxMana = Mathf.Min(opponentMaxMana + 1, 10);
+        opponentMana = opponentMaxMana; // 重置對手的魔法值
+        DrawCard(true, 1); // 玩家抽牌
+
         UIManager.UpdateUI();
     }
 
+    // 移除牌組中的卡牌 (現在主要用於測試或特殊效果，因為手牌移除已直接處理)
     public void RemoveCardFromDeck(Card card, bool isPlayer)
     {
         List<Card> deck = isPlayer ? playerDeck : opponentDeck;
@@ -304,29 +267,26 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // 抽牌邏輯
     void DrawCard(bool isPlayer, int count)
     {
         List<Card> deck = isPlayer ? playerDeck : opponentDeck;
+        List<Card> hand = isPlayer ? playerHand : opponentHand;
+
         for (int i = 0; i < count; i++)
         {
             if (deck.Count == 0)
             {
-                Debug.LogWarning($"{(isPlayer ? "Player" : "Opponent")} deck is empty!");
+                Debug.LogWarning($"{(isPlayer ? "Player" : "Opponent")} deck is empty! Cannot draw more cards.");
+                // 處理牌庫耗盡的情況，例如判斷遊戲結束
+                CheckGameOver(); // 牌庫耗盡也可能導致遊戲結束
                 return;
             }
 
             Card card = deck[Random.Range(0, deck.Count)];
             deck.Remove(card);
-            if (isPlayer)
-            {
-                playerHand.Add(card);
-                Debug.Log($"Drew card {card.name} to playerHand. playerHand count: {playerHand.Count}");
-            }
-            else
-            {
-                opponentHand.Add(card);
-                Debug.Log($"Drew card {card.name} to opponentHand. opponentHand count: {opponentHand.Count}");
-            }
+            hand.Add(card);
+            Debug.Log($"Drew card {card.name} to {(isPlayer ? "player" : "opponent")}Hand. {(isPlayer ? "player" : "opponent")}Hand count: {hand.Count}");
         }
     }
 
@@ -335,38 +295,33 @@ public class GameManager : MonoBehaviour
         if (playerHealth <= 0)
         {
             UIManager.ShowGameOver("對手勝利!");
+            Time.timeScale = 0; // 暫停遊戲
         }
         else if (opponentHealth <= 0)
         {
             UIManager.ShowGameOver("玩家勝利!");
+            Time.timeScale = 0; // 暫停遊戲
         }
     }
 
+    // 接收線上對手打出卡牌訊息 (僅用於線上模式)
     public void ReceivePlayCard(Card card)
     {
-        Debug.Log($"Received playCard: {card.name} for opponent.");
-        //PlayCard(card, false);
-        cardPlayService.PlayCard(card, false);
+        Debug.Log($"Received playCard: {card.name} for opponent (online).");
+        // online 模式下，收到對手的打牌訊息，直接讓 CardPlayService 處理
+        Card actualCardInOpponentHand = opponentHand.Find(c => c.id == card.id);
+        if (actualCardInOpponentHand != null)
+        {
+            // 在線上模式中，對手打牌可能沒有實際的 CardObject，因為我們沒有對手手牌的UI實例
+            // UIManager 會根據 CardPlayService 的需求來處理動畫
+            cardPlayService.PlayCard(actualCardInOpponentHand, false, null); // 傳遞 null 或一個 placeholder object
+        }
+        else
+        {
+            Debug.LogError($"Received card {card.name} (ID: {card.id}) not found in opponent's hand for online play. This should not happen.");
+            // 在此情況下，可能需要重新同步遊戲狀態，或強制應用效果
+            card.ApplyCardEffect(false);
+            CheckGameOver();
+        }
     }
-
-    public void ReceiveEndTurn()
-    {
-        Debug.Log("Received endTurn from opponent.");
-        isPlayerTurn = true;
-        maxMana = Mathf.Min(maxMana + 1, 10);
-        playerMana = maxMana; // 重置玩家的魔法值
-        opponentMaxMana = Mathf.Min(opponentMaxMana + 1, 10); // 增加對手的最大魔法值
-        opponentMana = opponentMaxMana; // 重置對手的魔法值
-        Debug.Log($"Opponent mana reset. Max: {opponentMaxMana}, Current: {opponentMana}");
-        DrawCard(true, 1);
-        UIManager.UpdateUI();
-    }
-}
-
-[System.Serializable]
-public class GameMessage
-{
-    public string type; // 例如 "playCard", "endTurn"
-    public string cardId;
-    // 可添加更多字段
 }

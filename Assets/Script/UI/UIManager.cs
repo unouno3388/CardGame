@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
-using DG.Tweening ;
-using UVS = Unity.VisualScripting;
+using DG.Tweening;
+using System.Collections; // For IEnumerator
 
 public class UIManager : MonoBehaviour
 {
@@ -16,16 +16,18 @@ public class UIManager : MonoBehaviour
     public Text gameOverText;
     public GameObject cardPrefab;
     public float cardSpacing = 10f;
+
     // 將 GameObject 列表命名得更清晰，以區分數據和UI物件
     private List<GameObject> playerHandCardObjects = new List<GameObject>();
     private List<GameObject> opponentHandCardObjects = new List<GameObject>();
-    private List<GameObject> playerFieldCardObjects = new List<GameObject>(); // playerFieldCardUIs -> playerFieldCardObjects
-    private List<GameObject> opponentFieldCardObjects = new List<GameObject>(); // opponentFieldCardUIs -> opponentFieldCardObjects
+    private List<GameObject> playerFieldCardObjects = new List<GameObject>();
+    private List<GameObject> opponentFieldCardObjects = new List<GameObject>();
 
     public Transform animationContainer;
+
     void Awake()
     {
-        if (playerHandPanel == null || opponentHandPanel == null || 
+        if (playerHandPanel == null || opponentHandPanel == null ||
             playerFieldPanel == null || opponentFieldPanel == null || cardPrefab == null)
         {
             Debug.LogError("UIManager: One or more UI components are not assigned!");
@@ -78,7 +80,6 @@ public class UIManager : MonoBehaviour
         }
 
         // 1. 銷毀不再存在於手牌數據中的舊UI物件
-        // 使用一個臨時列表來迭代和修改，避免在迭代時修改集合
         List<GameObject> toRemove = new List<GameObject>();
         foreach (var cardObj in handCardObjectsList)
         {
@@ -93,10 +94,9 @@ public class UIManager : MonoBehaviour
 
         foreach (var cardObjToRemove in toRemove)
         {
-            // Debug.Log($"UpdateHand: Removing old card UI {cardObjToRemove.name}");
             handCardObjectsList.Remove(cardObjToRemove); // 從追蹤列表移除
-            DG.Tweening.DOTween.Kill(cardObjToRemove.transform); // 停止動畫
-            Destroy(cardObjToRemove); // 銷毀GameObject (取消註解)
+            DOTween.Kill(cardObjToRemove.transform); // 停止動畫
+            Destroy(cardObjToRemove); // 銷毀GameObject
         }
 
         // 2. 更新現有或創建新的UI物件以匹配手牌數據
@@ -120,7 +120,7 @@ public class UIManager : MonoBehaviour
                     if (rect != null) // 增加空檢查
                     {
                         rect.localScale = Vector3.one;
-                        rect.sizeDelta = new Vector2(100, 150); // 考慮將這些值設為可配置
+                        rect.sizeDelta = new Vector2(100, 150);
                         rect.anchorMin = new Vector2(0.5f, 0.5f);
                         rect.anchorMax = new Vector2(0.5f, 0.5f);
                         rect.pivot = new Vector2(0.5f, 0.5f);
@@ -133,21 +133,16 @@ public class UIManager : MonoBehaviour
                     Destroy(newCardObj);
                 }
             }
-            // 如果已存在，則不進行操作 (假設其Initialize已正確，或在其他地方處理更新)
-            // 如果需要強制更新已存在的卡牌UI，可以在這裡調用 existingCardObj.GetComponent<CardUI>().Initialize(...)
         }
-        
-        // 確保 HorizontalLayoutGroup 更新
+
         HorizontalLayoutGroup layout = panel.GetComponent<HorizontalLayoutGroup>();
         if (layout != null)
         {
             layout.spacing = cardSpacing;
             LayoutRebuilder.ForceRebuildLayoutImmediate(panel.GetComponent<RectTransform>());
         }
-        // Canvas.ForceUpdateCanvases(); // 通常 LayoutRebuilder.ForceRebuildLayoutImmediate 已經足夠
     }
 
-    // UpdateField 也做類似的修改，接受 List<GameObject> fieldCardObjectsList
     void UpdateField(List<Card> fieldData, Transform panel, bool isPlayer, List<GameObject> fieldCardObjectsList)
     {
         if (panel == null)
@@ -170,7 +165,7 @@ public class UIManager : MonoBehaviour
         foreach (var cardObjToRemove in toRemove)
         {
             fieldCardObjectsList.Remove(cardObjToRemove);
-            DG.Tweening.DOTween.Kill(cardObjToRemove.transform);
+            DOTween.Kill(cardObjToRemove.transform);
             Destroy(cardObjToRemove);
         }
 
@@ -213,7 +208,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-
     public void PlayCardWithAnimation(Card card, bool isPlayer, GameObject cardObject, Transform sourcePanel, Transform targetPanel)
     {
         if (card == null || cardObject == null || targetPanel == null)
@@ -223,7 +217,6 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        // --- 修改開始 ---
         // 從 UIManager 的手牌追蹤列表中移除，因為它即將播放動畫並由 CardAnimationManager 管理其生命週期
         bool removed = false;
         if (isPlayer)
@@ -237,10 +230,11 @@ public class UIManager : MonoBehaviour
         if (removed)
         {
             // Debug.Log($"UIManager: Removed {cardObject.name} from tracking list for animation.");
-        } else {
+        }
+        else
+        {
             // Debug.LogWarning($"UIManager: Could not remove {cardObject.name} from tracking list. It might have been already removed or not tracked correctly.");
         }
-        // --- 修改結束 ---
 
         DOTween.Kill(cardObject.transform, true); // 確保殺死的是 transform 上的動畫，或者 cardObject 本身
         CardUI.IsAnimationPlaying = true;
@@ -258,23 +252,32 @@ public class UIManager : MonoBehaviour
         });
     }
 
-    // IEnumerator<WaitForSeconds> 應為 System.Collections.IEnumerator
-    private System.Collections.IEnumerator DelayedUpdateUI() // 修改返回類型
+    private IEnumerator DelayedUpdateUI()
     {
         yield return new WaitForSeconds(0.1f); // 稍微縮短延遲，但仍需確保動畫回調優先
         if (GameManager.Instance != null && GameManager.Instance.UIAutoUpdate) // 檢查 UIAutoUpdate 標誌
         {
-            // Debug.Log("DelayedUpdateUI: Calling UpdateUI.");
             GameManager.Instance.UIManager.UpdateUI();
         }
     }
 
-    IEnumerator<UVS.Null> DestroyAfterFrame(GameObject obj)
+    // 新增方法：根據 Card 數據找到對應的對手手牌 UI GameObject
+    public GameObject GetOpponentHandCardObject(Card card)
     {
-        yield return null; // 等一幀
-        if (obj != null)
-            Destroy(obj);
+        foreach (var cardObj in opponentHandCardObjects)
+        {
+            if (cardObj != null)
+            {
+                CardUI cardUI = cardObj.GetComponent<CardUI>();
+                if (cardUI != null && cardUI.card == card && cardObj.activeInHierarchy)
+                {
+                    return cardObj;
+                }
+            }
+        }
+        return null;
     }
+
     public void ShowGameOver(string message)
     {
         if (gameOverText != null)

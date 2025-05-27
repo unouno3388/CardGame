@@ -5,18 +5,18 @@ using System.Threading.Tasks;
 public class WebSocketManager : MonoBehaviour
 {
     private WebSocket ws;
+    private const string ServerUrl = "ws://localhost:8080/game"; // 將URL設為常量
 
-    void Start()
-    {
-        if (GameManager.Instance.IsOnline)
-        {
-            Connect();
-        }
-    }
-
+    // Connect 方法現在是 public，由 GameManager 調用
     public async void Connect()
     {
-        ws = new WebSocket("ws://localhost:8080/game");
+        if (ws != null && ws.State == WebSocketState.Open)
+        {
+            Debug.Log("WebSocket is already connected.");
+            return;
+        }
+
+        ws = new WebSocket(ServerUrl);
 
         ws.OnOpen += () =>
         {
@@ -32,11 +32,13 @@ public class WebSocketManager : MonoBehaviour
         ws.OnError += (error) =>
         {
             Debug.LogError("WebSocket error: " + error);
+            // 可以添加重連邏輯或錯誤提示
         };
 
         ws.OnClose += (code) =>
         {
             Debug.Log("WebSocket closed: " + code);
+            // 可以處理斷線後的行為
         };
 
         try
@@ -60,7 +62,7 @@ public class WebSocketManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("WebSocket is not connected!");
+            Debug.LogWarning("WebSocket is not connected. Cannot send playCard message.");
         }
     }
 
@@ -75,36 +77,44 @@ public class WebSocketManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("WebSocket is not connected!");
+            Debug.LogWarning("WebSocket is not connected. Cannot send endTurn message.");
         }
     }
 
     void OnMessageReceived(string message)
     {
-        var data = JsonUtility.FromJson<GameMessage>(message);
-        if (data.type == "playCard")
+        // 在主線程中處理接收到的消息，避免線程問題
+        MainThreadDispatcher.Instance.Enqueue(() =>
         {
-            if (int.TryParse(data.cardId, out int cardId))
+            var data = JsonUtility.FromJson<GameMessage>(message);
+            if (data.type == "playCard")
             {
-                Card card = GameManager.Instance.opponentDeck.Find(c => c.id == cardId);
-                if (card != null)
+                if (int.TryParse(data.cardId, out int cardId))
                 {
-                    GameManager.Instance.ReceivePlayCard(card);
+                    // 找到對應的卡牌數據
+                    // 這裡假設對手的牌庫是同步的，或者我們可以從伺服器獲得完整的卡牌數據
+                    // 為了簡化，我們從 GameManager 的 opponentDeck 中查找
+                    Card card = GameManager.Instance.opponentDeck.Find(c => c.id == cardId);
+                    if (card != null)
+                    {
+                        GameManager.Instance.ReceivePlayCard(card); // 將處理交給 GameManager
+                    }
+                    else
+                    {
+                        Debug.LogError($"Received card ID {data.cardId} not found in opponentDeck!");
+                        // 更嚴謹的處理應是請求伺服器同步數據或宣告錯誤
+                    }
                 }
                 else
                 {
-                    Debug.LogError($"Received card ID {data.cardId} not found in opponentDeck!");
+                    Debug.LogError($"Invalid cardId format: {data.cardId}");
                 }
             }
-            else
+            else if (data.type == "endTurn")
             {
-                Debug.LogError($"Invalid cardId format: {data.cardId}");
+                GameManager.Instance.ReceiveEndTurn(); // 將處理交給 GameManager
             }
-        }
-        else if (data.type == "endTurn")
-        {
-            GameManager.Instance.ReceiveEndTurn();
-        }
+        });
     }
 
     void Update()
@@ -122,4 +132,12 @@ public class WebSocketManager : MonoBehaviour
             await ws.Close();
         }
     }
+}
+
+[System.Serializable]
+public class GameMessage
+{
+    public string type; // 例如 "playCard", "endTurn"
+    public string cardId;
+    // 可添加更多字段
 }
