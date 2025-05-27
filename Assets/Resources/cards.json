@@ -1,0 +1,39 @@
+{
+  "cards": [
+    {
+      "cardId": 1,
+      "cardName": "Fireball",
+      "spritePath": "cards/card1",
+      "effectType": "Attack",
+      "cost": 4
+    },
+    {
+      "cardId": 2,
+      "cardName": "Shield",
+      "spritePath": "cards/card2",
+      "effectType": "Defense",
+      "cost": 2
+    },
+    {
+      "cardId": 3,
+      "cardName": "Heal",
+      "spritePath": "cards/card3",
+      "effectType": "Buff",
+      "cost": 3
+    },
+    {
+      "cardId": 4,
+      "cardName": "Lightning Bolt",
+      "spritePath": "cards/card4",
+      "effectType": "Attack",
+      "cost": 5
+    },
+    {
+      "cardId": 5,
+      "cardName": "Ice Shield",
+      "spritePath": "cards/card5",
+      "effectType": "Defense",
+      "cost": 3
+    }
+  ]
+}

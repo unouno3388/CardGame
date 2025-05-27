@@ -1,0 +1,19 @@
+{
+    "cards": [
+      {
+        "cardId": 1,
+        "cardName": "Card 1",
+        "spritePath": "cards/card1"
+      },
+      {
+        "cardId": 2,
+        "cardName": "Card 2",
+        "spritePath": "cards/card2"
+      },
+      {
+        "cardId": 3,
+        "cardName": "Card 3",
+        "spritePath": "cards/card3"
+      }
+    ]
+  }
