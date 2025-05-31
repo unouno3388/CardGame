@@ -5,19 +5,35 @@ public class MenuManager : MonoBehaviour
 {
     public void StartOnePlayer()
     {
-        Debug.Log("Starting single-player game...");
-        // 在載入場景前設定遊戲模式
-        GameManager.initialGameMode = GameManager.GameMode.OfflineSinglePlayer;
+        Debug.Log("Starting offline single-player game...");
+        GameManager.initialGameMode = GameManager.GameMode.OfflineSinglePlayer; //
         SceneManager.LoadScene("SampleScene"); // 載入名稱為 "SampleScene" 的場景
     }
 
-    public void StartTwoPlayer()
+    // 【新增】啟動線上單人 AI 對戰模式
+    public void StartOnlineSinglePlayerAI()
     {
-        Debug.Log("Starting two-player (online) game...");
-        // 在載入場景前設定遊戲模式
-        GameManager.initialGameMode = GameManager.GameMode.OnlineMultiplayer;
+        Debug.Log("Starting online single-player game (Server AI)...");
+        GameManager.initialGameMode = GameManager.GameMode.OnlineSinglePlayerAI; // 新的遊戲模式
         SceneManager.LoadScene("SampleScene");
     }
+
+    // 【新增】啟動線上雙人房間模式
+    public void StartOnlineMultiplayerRoom()
+    {
+        Debug.Log("Starting online two-player (Room) game...");
+        GameManager.initialGameMode = GameManager.GameMode.OnlineMultiplayerRoom; // 新的遊戲模式
+        SceneManager.LoadScene("SampleScene");
+    }
+
+    // 原始的 StartTwoPlayer 方法，如果仍然需要，可以保留或根據新的房間模式調整
+    // public void StartTwoPlayer()
+    // {
+    //     Debug.Log("Starting two-player (online) game...");
+    //     // 在載入場景前設定遊戲模式
+    //     GameManager.initialGameMode = GameManager.GameMode.OnlineMultiplayer; // // 這個模式可能被 OnlineMultiplayerRoom 取代
+    //     SceneManager.LoadScene("SampleScene"); //
+    // }
 
     public void QuitGame()
     {

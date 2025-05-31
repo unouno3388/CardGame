@@ -3,13 +3,14 @@ using UnityEngine;
 [System.Serializable]
 public class Card
 {
-    public int id;
+    public string id;
     public string name;
     public int cost;
     public int attack;
     public int value;
     public string effect;
     public Sprite sprite;
+    public string cardType; // 【新增】例如 "Minion", "Spell"
 
     public void ApplyCardEffect(bool isPlayer)
     {
