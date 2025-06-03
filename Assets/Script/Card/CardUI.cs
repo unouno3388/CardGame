@@ -215,7 +215,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         {
             Debug.Log("y = "+originalPosition.y + 1f);
             transform.DOScale(originalScale * 1.5f, 0.2f).SetEase(Ease.OutQuad);
-            transform.DOMoveY(originalPosition.y + 1f, 0.5f).SetEase(Ease.OutQuad);
+            //transform.DOMoveY(originalPosition.y + 2f, 0.5f).SetEase(Ease.OutQuad);
         }
     }
 
@@ -226,7 +226,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         {
              Debug.Log("y = "+originalPosition.y );
             transform.DOScale(originalScale, 0.2f).SetEase(Ease.OutQuad);
-            transform.DOMoveY(originalPosition .y - 1f, 0.5f).SetEase(Ease.OutQuad);
+            //transform.DOMoveY(originalPosition .y - 2f, 0.5f).SetEase(Ease.OutQuad);
         }
     }
 

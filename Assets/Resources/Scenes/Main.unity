@@ -204,19 +204,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 205511436}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1257459441}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: StartOnlineSinglePlayerAI
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &205511436
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -429,19 +417,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 382683080}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1257459441}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: QuitGame
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &382683080
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -987,6 +963,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &760597795
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 760597797}
+  - component: {fileID: 760597796}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &760597796
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760597795}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90c00c97c61da2f41b7e1702ec78dac8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &760597797
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760597795}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2.0852485, y: 0.05713785, z: 633.80664}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1045219578
 GameObject:
   m_ObjectHideFlags: 0
@@ -1305,19 +1325,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1199931250}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1257459441}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: StartTwoPlayer
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &1199931250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1534,6 +1542,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 94e8d7171de5f6847ba75196a294fd14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  gameOverManager: {fileID: 0}
+  startOnePlayerButton: {fileID: 1847096805}
+  startOnlineSinglePlayerAIButton: {fileID: 205511435}
+  startOnlineMultiplayerRoomButton: {fileID: 1199931249}
+  quitGameButton: {fileID: 382683079}
 --- !u!1 &1578093594
 GameObject:
   m_ObjectHideFlags: 0
@@ -2284,19 +2297,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1847096806}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1257459441}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: StartOnePlayer
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &1847096806
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2475,5 +2476,6 @@ SceneRoots:
   - {fileID: 344460932}
   - {fileID: 1047114895}
   - {fileID: 461799157}
+  - {fileID: 760597797}
   - {fileID: 1257459440}
   - {fileID: 687391793}

@@ -2,11 +2,16 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq; // Added for Linq usage
 using System.Collections; // 【新增】為了協程
-
+using UnityEngine.SceneManagement; // 【新增】為了 SceneManager
+using Newtonsoft.Json;
+using System.Threading.Tasks;
+using UnityEngine.UI; // 【新增】為了 JSON 序列化和反序列化
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
     public static GameMode initialGameMode = GameMode.OfflineSinglePlayer;
+    public static string GameSceneName = "SampleScene";
+
 
     public int playerHealth = 30;
     public int opponentHealth = 30;
@@ -25,6 +30,8 @@ public class GameManager : MonoBehaviour
 
     public UIManager UIManager { get; private set; }
     private AIManager aiManager; // 在 OnlineSinglePlayerAI 模式下，這個客戶端 AI 不會被使用
+
+    public MenuManager menuManager;
     private WebSocketManager wsManager;
     public WebSocketManager WebSocketManager => wsManager;
     private CardPlayService cardPlayService;
@@ -59,7 +66,12 @@ public class GameManager : MonoBehaviour
     private const string AI_SERVER_URL = "ws://localhost:8080/game/ai";
     private const string ROOM_SERVER_URL = "ws://localhost:8080/game/room";
 
-
+    #region  Game Over 處理變數
+    private bool _isGameOverSequenceRunning = false; // 標記遊戲結束序列是否已啟動，防止重複觸發
+    private string _pendingGameOverMessage = "";
+    private bool _pendingPlayerWon = false;
+    private Coroutine _gameOverDisplayCoroutine = null; // 用於儲存協程的引用，以便可以停止它
+    #endregion
     void Awake()
     {
         if (Instance == null)
@@ -73,11 +85,24 @@ public class GameManager : MonoBehaviour
             return; // 【新增】避免後續的 GetComponent 報錯
         }
 
-        UIManager = GetComponent<UIManager>();
+        SceneLoadingManager.Instance.RegisterSceneLoadCallback(SceneLoadingManager.GameSceneName, OnSceneLoaded); // 註冊場景載入回調
+
+        // *** 確保這個 Awake 方法存在，並且正確獲取了 MenuManager 的引用 ***
+        if (menuManager == null)
+        {
+            menuManager = FindObjectOfType<MenuManager>(); // 尋找場景中第一個 MenuManager 的實例
+            if (menuManager == null)
+            {
+                Debug.LogError("GameManager: 在場景中找不到 MenuManager 實例！請確保 SceneLoader 存在並掛載 MenuManager。");
+            }
+        }
+
+        //UIManager = GetComponent<UIManager>();
+        UIManager = FindObjectOfType<UIManager>();
         aiManager = GetComponent<AIManager>();
         wsManager = GetComponent<WebSocketManager>(); // 確保 WebSocketManager 先被初始化
         cardPlayService = gameObject.AddComponent<CardPlayService>();
-
+        //SetupMessageHandlers();
         if (UIManager == null || aiManager == null || wsManager == null || cardPlayService == null)
         {
             Debug.LogError("GameManager: Missing required components!");
@@ -89,7 +114,179 @@ public class GameManager : MonoBehaviour
         // PlayerId 可以考慮在連接成功後由伺服器分配，或在這裡簡單生成
         // PlayerId = System.Guid.NewGuid().ToString().Substring(0, 8);
         StartGame(initialGameMode);
+
+        // 在遊戲開始時確保遊戲結束 Panel 是隱藏的
+        if (menuManager != null)
+        {
+            menuManager.gameOverManager.HideGameOverPanel();
+        }
+        // 確保遊戲時間刻度是正常的
+        Time.timeScale = 1;
     }
+    void SetupMessageHandlers()
+    {
+        if (wsManager == null) return;
+
+        // 注意：這裡的處理函式需要符合 MessageHandlerDelegate 的簽章 (object data)
+        // 並且在內部進行 JsonConvert.DeserializeObject<SpecificType>(data.ToString())
+        wsManager.RegisterMessageHandler("gameStart", (data) =>
+        {
+            ServerGameState gameStartState = JsonConvert.DeserializeObject<ServerGameState>(data.ToString()); //
+            HandleGameStartFromServer(gameStartState); //
+        });
+        wsManager.RegisterMessageHandler("gameStateUpdate", (data) =>
+        {
+            ServerGameState gameState = JsonConvert.DeserializeObject<ServerGameState>(data.ToString()); //
+            HandleGameStateUpdateFromServer(gameState); //
+        });
+        wsManager.RegisterMessageHandler("roomUpdate", (data) =>
+        {
+            ServerRoomState roomState = JsonConvert.DeserializeObject<ServerRoomState>(data.ToString()); //
+            HandleRoomUpdateFromServer(roomState); //
+        });
+        wsManager.RegisterMessageHandler("aiAction", (data) =>
+        {
+            var aiActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            if (aiActionData.TryGetValue("actionType", out object aiActionType) && aiActionType.ToString() == "playCard") //
+            {
+                if (aiActionData.TryGetValue("card", out object cardObj)) //
+                {
+                    ServerCard aiCard = JsonConvert.DeserializeObject<ServerCard>(cardObj.ToString()); //
+                    HandleAIPlayCard(aiCard); //
+                }
+            }
+        });
+        wsManager.RegisterMessageHandler("opponentPlayCard", (data) =>
+        {
+            var opponentPlayData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            if (opponentPlayData.TryGetValue("card", out object cardData) && //
+                opponentPlayData.TryGetValue("playerName", out object playerNameObj)) //
+            {
+                ServerCard playedCard = JsonConvert.DeserializeObject<ServerCard>(cardData.ToString()); //
+                HandleOpponentPlayCard(playedCard, playerNameObj.ToString()); //
+            }
+        });
+        wsManager.RegisterMessageHandler("roomCreated", (data) =>
+        {
+            // 在 GameMessage 中, roomId 和 message 是頂層欄位, 不是在 data 裡
+            // 但如果伺服器確實將它們放在 data 中，則需要像這樣處理：
+            // var roomData = JsonConvert.DeserializeObject<Dictionary<string, string>>(data.ToString());
+            // string roomId = roomData.TryGetValue("roomId", out var r) ? r : null;
+            // string message = roomData.TryGetValue("message", out var m) ? m : null;
+            // Debug.Log($"Room created: {roomId}, Message: {message}");
+            // -- 假設 baseMessage 仍然在 HandleMessageFromServer 的作用域內 --
+            // -- 或者讓 WebSocketManager 傳遞整個 baseMessage 給處理器 --
+            // 為了簡單起見，假設處理器可以訪問到 baseMessage (這需要修改委派簽章)
+            // 或者，更好的方式是讓 WebSocketManager 在呼叫處理器前就解析好這些通用欄位。
+            // 目前的範例是直接將 baseMessage.data 傳入，所以無法直接訪問 baseMessage.roomId。
+            // 這裡我們假設 GameMessage 的 roomId 和 message 欄位由 WebSocketManager 在分發前提取。
+            // 實際上，像 roomCreated, roomJoined, leftRoom, error 這類訊息，
+            // 其關鍵資訊 (roomId, message) 通常不在 `data` 欄位中，而是在 `GameMessage` 的頂層欄位。
+            // 這表示 `HandleMessageFromServer` 在分派給這些特定處理器時，可能需要傳遞整個 `GameMessage` 物件，
+            // 或者這些處理器需要一個不同的委派簽章，例如 `Action<GameMessage>`.
+            // 為了保持一致性，且不修改委派，我們先假設 `baseMessage` 透過某种方式可以被訪問，
+            // 或者像原本的 switch case 一樣，直接在 `HandleMessageFromServer` 中處理這些頂層欄位。
+
+            // 以下是基於原 switch case 的邏輯，假設這些資訊從 data 中提取 (如果後端是這樣設計的話)
+            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); // 重新序列化再反序列化以匹配 GameMessage 結構
+            Debug.Log($"Room created: {eventData.roomId}, Message: {eventData.message}"); //
+            RoomId = eventData.roomId; //
+            IsInRoom = true; //
+            if (UIManager != null)
+            { //
+                UIManager.UpdateRoomStatus($"房間創建成功！\n房間ID: {eventData.roomId}\n等待對手加入..."); //
+                UIManager.SetRoomPanelActive(true); //
+                UIManager.ToggleRoomJoinCreateButtons(false); //
+            }
+        });
+        wsManager.RegisterMessageHandler("roomJoined", (data) =>
+        {
+            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data));
+            Debug.Log($"Joined room: {eventData.roomId}, Message: {eventData.message}"); //
+            RoomId = eventData.roomId; //
+            IsInRoom = true; //
+            if (UIManager != null)
+            { //
+                UIManager.UpdateRoomStatus($"成功加入房間: {eventData.roomId}"); //
+            }
+        });
+        wsManager.RegisterMessageHandler("leftRoom", (data) =>
+        {
+            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data));
+            Debug.Log($"Left room: {eventData.message}"); //
+            RoomId = null; //
+            IsInRoom = false; //
+            if (UIManager != null)
+            { //
+                UIManager.UpdateRoomStatus("您已離開房間。"); //
+                UIManager.SetRoomPanelActive(CurrentGameMode == GameMode.OnlineMultiplayerRoom); //
+                UIManager.ToggleRoomJoinCreateButtons(true); //
+            }
+        });
+        wsManager.RegisterMessageHandler("error", (data) =>
+        {
+            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data));
+            Debug.LogError("Server error: " + eventData.message); //
+            if (UIManager != null) //
+            {
+                UIManager.ShowErrorPopup(eventData.message); //
+            }
+        });
+        wsManager.RegisterMessageHandler("playerAction", (data) =>
+        {
+            var playerActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            if (playerActionData.TryGetValue("action", out object playerActionType) && playerActionType.ToString() == "playCard" && //
+                playerActionData.TryGetValue("success", out object successObj) && (bool)successObj == true) //
+            {
+                if (playerActionData.TryGetValue("cardId", out object cardIdObj)) //
+                {
+                    string playedCardId = cardIdObj.ToString(); //
+                    Debug.Log($"WebSocketManager: Received playerAction confirmation for cardId: {playedCardId}"); //
+                    HandlePlayerCardPlayConfirmed(playedCardId); //
+                }
+            }
+        });
+    }
+    #region  場景載入處理
+
+    void OnSceneLoaded()
+    {
+        // 檢查載入的是否為遊戲主場景
+        //if (scene.name == GameSceneName) // 使用先前定義的 GameSceneName
+        //{
+        //Debug.Log($"遊戲場景 '{scene.name}' 已載入。準備使用模式: {initialGameMode} 開始遊戲。");
+
+        // 確保遊戲時間正常 (如果因為上一局遊戲結束而設為0)
+        Time.timeScale = 1; //
+        // 嘗試獲取 UIManager (如果它也存在於遊戲場景或 DontDestroyOnLoad)
+        UIManager = FindObjectOfType<UIManager>();
+        Debug.Log($"UIManager found: {UIManager != null}");
+        SetupMessageHandlers();
+        // 嘗試獲取 MenuManager (如果它也存在於遊戲場景或 DontDestroyOnLoad)
+        // 但通常遊戲結束畫面不由主選單的 MenuManager 控制，而是由遊戲場景內的 UIManager 控制
+        if (menuManager == null)
+        {
+            menuManager = FindObjectOfType<MenuManager>(); //
+        }
+
+        // 隱藏遊戲結束畫面 (如果它是由 UIManager 控制的)
+        if (UIManager != null && UIManager.gameOverText != null && UIManager.gameOverText.gameObject.activeSelf)
+        {
+            UIManager.gameOverText.gameObject.SetActive(false); // 或者呼叫 UIManager.HideGameOver()
+        }
+        // 隱藏 MenuManager 控制的 GameOverPanel (如果 MenuManager 有效)
+        else if (menuManager != null && menuManager.gameOverManager.gameOverPanel != null && menuManager.gameOverManager.gameOverPanel.activeSelf) //
+        {
+            menuManager.gameOverManager.HideGameOverPanel(); //
+        }
+
+
+        // 呼叫 StartGame 來初始化或重新初始化遊戲
+        StartGame(initialGameMode); //
+        //}
+
+    }
+    #endregion
 
     void InitializeGameDefaults() // 【新增】一個通用的重置方法
     {
@@ -122,8 +319,11 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Starting game with mode: {currentGameMode}");
 
         // 確保 UI Manager 在遊戲開始時更新一次房間面板的顯示狀態
-        if (UIManager != null) {
+        if (UIManager != null)
+        {
             UIManager.SetRoomPanelActive(currentGameMode == GameMode.OnlineMultiplayerRoom && !IsInRoom);
+            if (UIManager.gameOverText != null) UIManager.gameOverText.gameObject.SetActive(false); //
+            UIManager.HideConnectingMessage(); //
         }
 
 
@@ -136,14 +336,14 @@ public class GameManager : MonoBehaviour
             // 連接到AI伺服器
             wsManager.ConnectToServer(AI_SERVER_URL);
             // UI可以顯示 "連接中..."
-            if(UIManager != null) UIManager.ShowConnectingMessage("正在連接到AI伺服器...");
+            if (UIManager != null) UIManager.ShowConnectingMessage("正在連接到AI伺服器...");
         }
         else if (currentGameMode == GameMode.OnlineMultiplayerRoom)
         {
             // 連接到房間伺服器
             wsManager.ConnectToServer(ROOM_SERVER_URL);
             // UI顯示房間創建/加入界面
-             if(UIManager != null) UIManager.ShowConnectingMessage("正在連接到房間伺服器...");
+            if (UIManager != null) UIManager.ShowConnectingMessage("正在連接到房間伺服器...");
             // UIManager.SetRoomPanelActive(true); // 這個在 InitializeGameDefaults 後由 UIManager 自己控制
         }
         // 舊的 OnlineMultiplayer 模式的處理 (如果保留)
@@ -152,14 +352,15 @@ public class GameManager : MonoBehaviour
         //     wsManager.ConnectToServer(ROOM_SERVER_URL); // 或者一個通用的P2P協調伺服器URL
         // }
 
-        if (currentGameMode != GameMode.OfflineSinglePlayer) {
-             // 線上模式的牌組和初始手牌通常由伺服器在 gameStart 或 roomUpdate 中提供
-             // 此處不清空，等待伺服器訊息
+        if (currentGameMode != GameMode.OfflineSinglePlayer)
+        {
+            // 線上模式的牌組和初始手牌通常由伺服器在 gameStart 或 roomUpdate 中提供
+            // 此處不清空，等待伺服器訊息
         }
 
-        if(UIManager != null) UIManager.UpdateUI(); // 初始UI更新
+        if (UIManager != null) UIManager.UpdateUI(); // 初始UI更新
     }
-
+    //離線模式測試用的
     void InitializeOfflineGame()
     {
         playerDeck = GenerateRandomDeck(30); //
@@ -171,7 +372,7 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Offline game initialized. PlayerDeck: {playerDeck.Count}, OpponentDeck: {opponentDeck.Count}");
     }
 
-
+    //離線模式測試用的
     List<Card> GenerateRandomDeck(int count)
     {
         // ... (此方法保持不變)
@@ -262,80 +463,218 @@ public class GameManager : MonoBehaviour
         // opponentHand.Clear(); // AI手牌通常不直接顯示，但可以顯示數量
         // if (initialState.aiHandCount.HasValue) UIManager.UpdateOpponentHandCount(initialState.aiHandCount.Value);
         opponentServerHandCount = initialState.aiHandCount ?? 0; // 【新增】存儲AI手牌數量
-        if(initialState.aiField != null) // 【新增】處理AI初始場地（如果有）
+        if (initialState.aiField != null) // 【新增】處理AI初始場地（如果有）
         {
             opponentField = ConvertServerCardsToClientCards(initialState.aiField);
-        } else {
+        }
+        else
+        {
             opponentField.Clear();
         }
 
         // 清除"連接中"的訊息
-        if (UIManager != null) {
+        if (UIManager != null)
+        {
             UIManager.HideConnectingMessage();
             UIManager.UpdateUI();
-            if(initialState.gameOver) CheckGameOver(); // 如果遊戲開始時就已結束 (不太可能，但做個檢查)
+            if (initialState.gameOver) CheckGameOver(); // 如果遊戲開始時就已結束 (不太可能，但做個檢查)
         }
     }
 
     // 【新增】處理從伺服器收到的遊戲狀態更新 (通用於兩種線上模式)
+    // 修改 HandleGameStateUpdateFromServer 方法
     public void HandleGameStateUpdateFromServer(ServerGameState updatedState)
     {
-        Debug.Log("Handling GameStateUpdateFromServer. Player turn: " + updatedState.isPlayerTurn);
-        // PlayerId 通常在連接時就設定好了，或者在 gameStart 時
-        if(!string.IsNullOrEmpty(updatedState.playerId) && PlayerId != updatedState.playerId && currentGameMode == GameMode.OnlineMultiplayerRoom) {
-            // 這是對手的狀態更新，或者是給特定玩家的狀態，需要區分
-            // 在房間模式，伺服器應該發送雙方的狀態，或者客戶端根據 currentPlayerId 判斷
-        }
+        Debug.Log("Handling GameStateUpdateFromServer. Player turn: " + updatedState.isPlayerTurn + ", GameOver: " + updatedState.gameOver); //
 
         // 更新自己的狀態 (假設 updatedState 是針對當前客戶端的視角)
-        playerHealth = updatedState.playerHealth;
-        playerMana = updatedState.playerMana;
-        maxMana = updatedState.playerMaxMana;
-        if (updatedState.playerHand != null) { // 伺服器可能只更新變動的部分，或者總是發送完整手牌
-            playerHand = ConvertServerCardsToClientCards(updatedState.playerHand);
+        playerHealth = updatedState.playerHealth; //
+        playerMana = updatedState.playerMana; //
+        maxMana = updatedState.playerMaxMana; //
+        if (updatedState.playerHand != null)
+        { //
+            playerHand = ConvertServerCardsToClientCards(updatedState.playerHand); //
         }
 
         // 更新對手的狀態
-        if (currentGameMode == GameMode.OnlineSinglePlayerAI) {
-            opponentHealth = updatedState.aiHealth;
-            opponentMana = updatedState.aiMana; // 假設可見
-            opponentMaxMana = updatedState.aiMaxMana; // 假設可見
-            // if (updatedState.aiHandCount.HasValue) UIManager.UpdateOpponentHandCount(updatedState.aiHandCount.Value);
-            opponentServerHandCount = updatedState.aiHandCount ?? 0; // 【新增】更新AI手牌數量
-            if (updatedState.aiField != null) // 【新增】更新AI場地
+        if (currentGameMode == GameMode.OnlineSinglePlayerAI)
+        { //
+            opponentHealth = updatedState.aiHealth; //
+            opponentMana = updatedState.aiMana; //
+            opponentMaxMana = updatedState.aiMaxMana; //
+            opponentServerHandCount = updatedState.aiHandCount ?? 0; //
+            if (updatedState.aiField != null) //
             {
-                opponentField = ConvertServerCardsToClientCards(updatedState.aiField);
-            } else {
-                opponentField.Clear();
+                opponentField = ConvertServerCardsToClientCards(updatedState.aiField); //
             }
-            
-        } else if (currentGameMode == GameMode.OnlineMultiplayerRoom) {
-            // 在房間模式，updatedState.opponentState 應該包含對手的公開資訊
-            if (updatedState.opponentState != null) {
-                opponentHealth = updatedState.opponentState.health;
-                opponentMana = updatedState.opponentState.mana;
-                opponentMaxMana = updatedState.opponentState.maxMana;
-                // if (updatedState.opponentState.handCount.HasValue) UIManager.UpdateOpponentHandCount(updatedState.opponentState.handCount.Value);
-                // OpponentPlayerId = updatedState.opponentState.playerId; // 如果有
+            else
+            {
+                opponentField.Clear(); //
+            }
+        }
+        else if (currentGameMode == GameMode.OnlineMultiplayerRoom)
+        { //
+            if (updatedState.opponentState != null)
+            { //
+                opponentHealth = updatedState.opponentState.health; //
+                opponentMana = updatedState.opponentState.mana; //
+                opponentMaxMana = updatedState.opponentState.maxMana; //
             }
         }
 
-        isPlayerTurn = updatedState.isPlayerTurn;
+        isPlayerTurn = updatedState.isPlayerTurn; //
 
-        if (UIManager != null) {
-            UIManager.HideConnectingMessage(); // 確保連接訊息被清除
-            UIManager.SetRoomPanelActive(currentGameMode == GameMode.OnlineMultiplayerRoom && !IsInRoom && !updatedState.gameStarted);
-            UIManager.UpdateUI();
+        // 【重要】先更新UI，讓血量等數值變化先生效
+        if (UIManager != null)
+        { //
+            UIManager.HideConnectingMessage(); //
+            UIManager.SetRoomPanelActive(currentGameMode == GameMode.OnlineMultiplayerRoom && !IsInRoom && !updatedState.gameStarted); //
+            UIManager.UpdateUI(); // 立即更新UI以反映最新的血量等狀態
         }
 
-        if (updatedState.gameOver) {
-            if (UIManager != null) {
-                UIManager.ShowGameOver(updatedState.winner == PlayerId || (currentGameMode == GameMode.OnlineSinglePlayerAI && updatedState.winner == "Player") ? "玩家勝利!" : "對手勝利!");
+        // 檢查遊戲是否結束
+        if (updatedState.gameOver && !_isGameOverSequenceRunning) // 如果遊戲結束且結束序列尚未啟動
+        {
+            _isGameOverSequenceRunning = true; // 標記序列已啟動
+
+            // 決定勝利訊息和狀態
+            if (currentGameMode == GameMode.OnlineSinglePlayerAI) //
+            {
+                _pendingPlayerWon = (updatedState.winner == "Player"); //
+                _pendingGameOverMessage = _pendingPlayerWon ? "You Win!" : "You lose!"; //
+                if (updatedState.winner != "Player" && updatedState.winner != "AI" && !string.IsNullOrEmpty(updatedState.winner))
+                {
+                    // 如果 winner 不是 "Player" 或 "AI"，但也不是空的，可能是一個 player ID
+                    // 在 OnlineSinglePlayerAI 模式下，這可能表示 AI 贏了（如果 winner 是 AI 的 ID）
+                    // 或者是一個未預期的值，此時可以默認為對手勝利或一般結束訊息
+                    _pendingGameOverMessage = "You lose!!"; // 或者 "遊戲結束!"
+                    _pendingPlayerWon = false;
+                }
+                else if (string.IsNullOrEmpty(updatedState.winner))
+                {
+                    _pendingGameOverMessage = "GameOver!"; // 如果沒有winner資訊
+                    _pendingPlayerWon = false; // 視情況而定
+                }
             }
-            Time.timeScale = 0; // 暫停遊戲
-        } else {
-            Time.timeScale = 1; // 確保遊戲在非結束時正常運行
+            else if (currentGameMode == GameMode.OnlineMultiplayerRoom)
+            {
+                _pendingPlayerWon = (updatedState.winner == PlayerId); // 假設 winner 是贏家 PlayerId
+                _pendingGameOverMessage = _pendingPlayerWon ? "玩家勝利!" : "對手勝利!";
+                if (string.IsNullOrEmpty(updatedState.winner))
+                { // 如果沒有 winner 資訊
+                    _pendingGameOverMessage = "遊戲結束!";
+                    // _pendingPlayerWon 應根據遊戲規則設定 (例如平手)
+                }
+            }
+            // 你可以為其他遊戲模式添加類似的邏輯
+
+            Debug.Log($"遊戲結束狀態已收到。勝利者: {updatedState.winner}。將等待動畫播放完畢...");
+
+            // 停止可能正在運行的舊的遊戲結束協程
+            if (_gameOverDisplayCoroutine != null)
+            {
+                StopCoroutine(_gameOverDisplayCoroutine);
+            }
+            // 啟動協程來處理延遲顯示 GameOver 畫面
+            _gameOverDisplayCoroutine = StartCoroutine(ShowGameOverScreenAfterAnimations());
         }
+        else if (!updatedState.gameOver && _isGameOverSequenceRunning)
+        {
+            // 如果後續的狀態更新說遊戲尚未結束，則取消遊戲結束序列
+            Debug.Log("後續狀態更新指示遊戲尚未結束，取消遊戲結束序列。");
+            _isGameOverSequenceRunning = false;
+            if (_gameOverDisplayCoroutine != null)
+            {
+                StopCoroutine(_gameOverDisplayCoroutine);
+                _gameOverDisplayCoroutine = null;
+            }
+            Time.timeScale = 1; // 確保遊戲時間恢復正常
+        }
+        else if (!updatedState.gameOver)
+        {
+            Time.timeScale = 1; // 確保遊戲時間在非結束時正常運行
+        }
+        // 原本的 Time.timeScale = 0; 和 UIManager.ShowGameOver 移至協程中
+    }
+
+    // 新增協程方法
+    private IEnumerator ShowGameOverScreenAfterAnimations()
+    {
+        Debug.Log("協程 ShowGameOverScreenAfterAnimations 已啟動。");
+
+        // 1. 等待一小段時間，讓UI有機會開始渲染更新（例如血條動畫）
+        //    yield return null; // 等待下一幀
+        yield return new WaitForSeconds(0.2f); // 給予一個稍微長一點的延遲，確保UI動畫能被觀察到
+
+        // 2. 等待所有卡牌動畫播放完畢
+        if (CardAnimationManager.Instance != null) //
+        {
+            float waitStartTime = Time.realtimeSinceStartup;
+            float maxWaitTime = 10f; // 設定一個最長等待時間，防止無限等待
+            while (CardAnimationManager.Instance.IsAnimationPlaying()) //
+            {
+                if (Time.realtimeSinceStartup - waitStartTime > maxWaitTime)
+                {
+                    Debug.LogWarning("等待卡牌動畫超時，將直接顯示遊戲結束畫面。");
+                    break;
+                }
+                Debug.Log("等待卡牌動畫播放完成...");
+                yield return null; // 等待下一幀
+            }
+            Debug.Log("卡牌動畫播放完成或超時。");
+        }
+        else
+        {
+            Debug.LogWarning("CardAnimationManager.Instance 為空，無法等待卡牌動畫。");
+        }
+
+        // 3. 再次檢查遊戲結束標記 (以防在這期間狀態又改變了)
+        if (!_isGameOverSequenceRunning)
+        {
+            Debug.Log("在等待動畫期間，遊戲結束狀態被重置，不再顯示GameOver畫面。");
+            yield break; // 退出協程
+        }
+
+        // 4. 顯示 GameOver 畫面
+        Debug.Log($"準備顯示遊戲結束畫面: {_pendingGameOverMessage}");
+        if (menuManager != null) //
+        {
+            menuManager.gameOverManager.ShowGameOverPanel(_pendingGameOverMessage, _pendingPlayerWon); //
+        }
+        else if (UIManager != null) // 作為備選，如果 MenuManager 不可用
+        {
+            UIManager.ShowGameOver(_pendingGameOverMessage); // 但這個方法沒有 isWin 參數
+            Debug.LogWarning("使用 UIManager.ShowGameOver 顯示遊戲結束訊息，此方法不包含 'isWin' 參數。");
+        }
+        else
+        {
+            Debug.LogError("MenuManager 和 UIManager 皆為空，無法顯示遊戲結束畫面！");
+        }
+
+        // 5. 暫停遊戲
+        Time.timeScale = 0; //
+        Debug.Log("遊戲已暫停。");
+
+        // 6. 【新增】斷開 WebSocket 連線 (如果是在線模式)
+        if (currentGameMode == GameMode.OnlineSinglePlayerAI || currentGameMode == GameMode.OnlineMultiplayerRoom) //
+        {
+            if (wsManager != null && wsManager.IsConnected()) //
+            {
+                Debug.Log("遊戲結束，準備斷開 WebSocket 連線...");
+                // wsManager.CloseConnection() 是一個 async Task 方法。
+                // 在協程中直接呼叫它，協程不會等待它完成，這通常是可以接受的，
+                // 因為我們只是想啟動關閉流程。
+                Task.Run(async () =>
+                {
+                    await wsManager.CloseConnection(); // 這個方法會處理斷線和清理
+                    Debug.Log("WebSocket 連線已關閉。");
+                });
+            }
+        }
+
+        // 7. 重置標記
+        _isGameOverSequenceRunning = false; //
+        _gameOverDisplayCoroutine = null; //
     }
     // 【新增】處理玩家出牌的確認 (來自 CardPlayService)
     public void HandlePlayerCardPlayConfirmed(string playedCardId)
@@ -383,66 +722,64 @@ public class GameManager : MonoBehaviour
         // 這裡的動畫主要是視覺表現。
     }
 
-// ...
+    // ...
     // 【新增】處理從伺服器收到的房間狀態更新 (OnlineMultiplayerRoom)
-    public void HandleRoomUpdateFromServer(ServerRoomState roomState) {
-        Debug.Log($"Handling RoomUpdateFromServer. Room: {roomState.roomId}, GameStarted: {roomState.gameStarted}, IsInRoom: {IsInRoom}");
-        RoomId = roomState.roomId;
-        IsInRoom = true; // 假設一旦收到 RoomUpdate，就表示已在房間內或剛加入
+    // 你可能也需要在 HandleRoomUpdateFromServer 方法中應用類似的邏輯，如果它也會處理 gameOver 狀態：
+    public void HandleRoomUpdateFromServer(ServerRoomState roomState)
+    {
+        // ... (更新房間和玩家狀態的現有邏輯) ...
+        Debug.Log($"Handling RoomUpdateFromServer. Room: {roomState.roomId}, GameStarted: {roomState.gameStarted}, IsInRoom: {IsInRoom}, GameOver: {roomState.gameOver}"); //
 
-        // 更新玩家列表等UI (UIManager 中實現)
-        // UIManager.UpdatePlayerList(roomState.players);
+        if (UIManager != null)
+        { //
+            UIManager.HideConnectingMessage(); //
+            // 注意：UpdateUI也應該在檢查gameOver之前，以便更新血量等
+            UIManager.UpdateUI(); //
+        }
 
-        if (roomState.gameStarted) {
-            UIManager.SetRoomPanelActive(false); // 遊戲開始，隱藏房間面板
-            // 遊戲開始的狀態由 roomState.self 和 roomState.opponent 提供
-            playerHealth = roomState.self.health;
-            playerMana = roomState.self.mana;
-            maxMana = roomState.self.maxMana;
-            playerHand = ConvertServerCardsToClientCards(roomState.self.hand);
-
-            if (roomState.opponent != null) {
-                opponentHealth = roomState.opponent.health;
-                opponentMana = roomState.opponent.mana;
-                opponentMaxMana = roomState.opponent.maxMana;
-                // UIManager.UpdateOpponentHandCount(roomState.opponent.handCount);
-                // OpponentPlayerId = roomState.opponent.playerId;
-            } else {
-                // 可能對手剛離開，或者在等待對手
-                opponentHealth = 0; // 或一個預設值
-                opponentMana = 0;
-                opponentMaxMana = 0;
+        if (roomState.gameOver && !_isGameOverSequenceRunning)
+        { //
+            _isGameOverSequenceRunning = true;
+            _pendingPlayerWon = (roomState.winnerId == PlayerId); //
+            _pendingGameOverMessage = _pendingPlayerWon ? "玩家勝利!" : "對手勝利!"; //
+            if (string.IsNullOrEmpty(roomState.winnerId) && roomState.gameStarted)
+            { // 如果遊戲開始了但沒有明確的winnerId
+                _pendingGameOverMessage = "遊戲結束!"; //
+                // _pendingPlayerWon 需要根據遊戲規則定義，例如平手或基於其他條件
             }
-            isPlayerTurn = (roomState.currentPlayerId == PlayerId);
 
-        } else {
-            // 遊戲未開始，仍在房間等待界面
-            UIManager.SetRoomPanelActive(true);
-            UIManager.UpdateRoomStatus($"房間ID: {RoomId}\n{(roomState.players != null ? string.Join(", ", roomState.players.Select(p=>p.Value)) : "等待玩家...")}\n{roomState.message}");
+            Debug.Log($"遊戲結束狀態(房間更新)已收到。勝利者ID: {roomState.winnerId}。將等待動畫播放完畢...");
+            if (_gameOverDisplayCoroutine != null) StopCoroutine(_gameOverDisplayCoroutine);
+            _gameOverDisplayCoroutine = StartCoroutine(ShowGameOverScreenAfterAnimations());
         }
-
-        if (UIManager != null) {
-            UIManager.HideConnectingMessage();
-            UIManager.UpdateUI();
+        else if (!roomState.gameOver && _isGameOverSequenceRunning)
+        {
+            Debug.Log("後續房間狀態更新指示遊戲尚未結束，取消遊戲結束序列。");
+            _isGameOverSequenceRunning = false;
+            if (_gameOverDisplayCoroutine != null)
+            {
+                StopCoroutine(_gameOverDisplayCoroutine);
+                _gameOverDisplayCoroutine = null;
+            }
+            Time.timeScale = 1; // 確保遊戲時間恢復正常
         }
-
-        if (roomState.gameOver) {
-            UIManager.ShowGameOver(roomState.winnerId == PlayerId ? "玩家勝利!" : "對手勝利!");
-            Time.timeScale = 0;
-        } else {
-            Time.timeScale = 1;
+        else if (!roomState.gameOver)
+        {
+            Time.timeScale = 1; //
         }
     }
 
     // 【新增】處理對手出牌的通知 (來自伺服器)
-    public void HandleOpponentPlayCard(ServerCard cardPlayed, string opponentPlayerName) {
+    public void HandleOpponentPlayCard(ServerCard cardPlayed, string opponentPlayerName)
+    {
         Debug.Log($"{opponentPlayerName} (Opponent) played card: {cardPlayed.name}");
 
         // 模擬對手出牌動畫，需要對手手牌面板的引用和卡牌物件
         // 1. 從對手手牌數據中移除 (如果客戶端也維護對手手牌數據的話，通常只維護數量)
         // 2. UIManager 播放動畫，將卡牌移動到場地
         Card clientCard = ConvertServerCardToClientCard(cardPlayed);
-        if (clientCard != null) {
+        if (clientCard != null)
+        {
             // 這一步比較複雜，因為我們沒有對手手牌的實際 GameObject
             // 理想情況下，UIManager 會收到這個 clientCard，然後在 opponentHandPanel 附近生成一個卡牌背面，
             // 播放它翻轉並移動到 opponentFieldPanel 的動畫，然後顯示卡牌內容。
@@ -457,17 +794,20 @@ public class GameManager : MonoBehaviour
     }
 
     // 【新增】處理AI出牌的通知 (來自伺服器)
-    public void HandleAIPlayCard(ServerCard serverCardPlayed) {
+    public void HandleAIPlayCard(ServerCard serverCardPlayed)
+    {
         Debug.Log($"GameManager: Handling online AI card play: {serverCardPlayed.name}");
         Card clientCard = ConvertServerCardToClientCard(serverCardPlayed);
 
-        if (clientCard != null && UIManager != null) {
+        if (clientCard != null && UIManager != null)
+        {
             // 創建臨時卡牌物件到動畫層
             GameObject tempAICardObject = Instantiate(UIManager.cardPrefab, UIManager.animationContainer);
             CardUI aiCardUI = tempAICardObject.GetComponent<CardUI>();
             RectTransform tempAIRectTransform = tempAICardObject.GetComponent<RectTransform>(); // 獲取 RectTransform
 
-            if (aiCardUI != null && tempAIRectTransform != null) { // 確保 RectTransform 也存在
+            if (aiCardUI != null && tempAIRectTransform != null)
+            { // 確保 RectTransform 也存在
                 // 【新增】設置臨時卡牌的初始位置到對手手牌區的中心或一個起始點
                 // 我們需要將 opponentHandPanel 的世界座標轉換為 animationContainer 下的局部座標
                 if (UIManager.opponentHandPanel != null && UIManager.animationContainer != null)
@@ -494,27 +834,34 @@ public class GameManager : MonoBehaviour
                 if (aiCardUI.cardDetailsContainer != null) aiCardUI.cardDetailsContainer.SetActive(true);
 
                 Debug.Log($"GameManager: Online AI playing '{clientCard.name}'. Triggering animation.");
-                
+
                 // 動畫的 sourcePanel 參數實際上在 CardAnimationManager 中沒有被用來決定起始位置，
                 // 因為卡牌已經在 animationContainer 中了。重要的是 cardObject 的當前位置。
                 // targetForAIAnimation 仍然是 opponentFieldPanel。
                 Transform sourceForAIAnimation = UIManager.opponentHandPanel; // 這個參數可以保留，但實際起點是上面設置的
                 Transform targetForAIAnimation = UIManager.opponentFieldPanel;
 
-                if (targetForAIAnimation != null) {
+                if (targetForAIAnimation != null)
+                {
                     Debug.Log($"GameManager.HandleAIPlayCard: Target for AI animation is '{targetForAIAnimation.name}' (InstanceID: {targetForAIAnimation.GetInstanceID()})");
-                } else {
+                }
+                else
+                {
                     Debug.LogError("GameManager.HandleAIPlayCard: UIManager.opponentFieldPanel IS NULL!");
-                    if(tempAICardObject != null) Destroy(tempAICardObject);
+                    if (tempAICardObject != null) Destroy(tempAICardObject);
                     return;
                 }
 
                 UIManager.PlayCardWithAnimation(clientCard, false, tempAICardObject, sourceForAIAnimation, targetForAIAnimation);
-            } else {
-                Debug.LogError("GameManager: Failed to get CardUI or RectTransform on instantiated tempAICardObject for AI card.");
-                if(tempAICardObject != null) Destroy(tempAICardObject);
             }
-        } else {
+            else
+            {
+                Debug.LogError("GameManager: Failed to get CardUI or RectTransform on instantiated tempAICardObject for AI card.");
+                if (tempAICardObject != null) Destroy(tempAICardObject);
+            }
+        }
+        else
+        {
             Debug.LogError($"GameManager: Failed to convert ServerCard '{serverCardPlayed.name}' or UIManager is null.");
         }
     }
@@ -544,7 +891,45 @@ public class GameManager : MonoBehaviour
 
     public void CheckGameOver()
     {
-        // 在線上模式，遊戲結束主要由伺服器判斷和通知
+        Debug.Log("CheckGameOver() 方法被呼叫了！"); // <-- 添加這行
+
+        Debug.Log("當前遊戲模式: " + currentGameMode); // 確認遊戲模式
+        Debug.Log("玩家生命值: " + playerHealth);       // 確認玩家血量
+        Debug.Log("對手生命值: " + opponentHealth);     // 確認對手血量
+        // 確保我們有 MenuManager 的引用
+        if (menuManager == null)
+        {
+            Debug.LogError("GameManager: MenuManager 引用丟失，無法顯示遊戲結束畫面。");
+            return; // 提前退出，避免空引用錯誤
+        }
+
+        if (currentGameMode == GameMode.OfflineSinglePlayer)
+        {
+            bool gameEnded = false;
+            bool playerWon = false;
+
+            if (playerHealth <= 0)
+            {
+                playerWon = false; // 玩家輸了
+                gameEnded = true;
+                menuManager.gameOverManager.ShowGameOverPanel("GameOver!", playerWon);
+            }
+            else if (opponentHealth <= 0)
+            {
+                playerWon = true; // 玩家贏了
+                gameEnded = true;
+                menuManager.gameOverManager.ShowGameOverPanel("YouWin!", playerWon);
+            }
+
+            if (gameEnded)
+            {
+                Time.timeScale = 0; // 暫停遊戲時間
+                // 你可以在這裡添加其他遊戲結束的邏輯，例如禁用玩家輸入等
+            }
+        }
+        // 在線上模式下，這裡可能會有伺服器通知的處理
+
+        /*// 在線上模式，遊戲結束主要由伺服器判斷和通知
         // 這個方法在離線模式下仍然有用
         if (currentGameMode == GameMode.OfflineSinglePlayer) {
             if (playerHealth <= 0)
@@ -557,27 +942,31 @@ public class GameManager : MonoBehaviour
                 UIManager.ShowGameOver("玩家勝利!"); //
                 Time.timeScale = 0; //
             }
-        }
+        }*/
     }
 
     // 【輔助方法】將伺服器卡牌列表轉換為客戶端卡牌列表
-    public List<Card> ConvertServerCardsToClientCards(List<ServerCard> serverCards) {
+    public List<Card> ConvertServerCardsToClientCards(List<ServerCard> serverCards)
+    {
         if (serverCards == null) return new List<Card>();
         List<Card> clientCards = new List<Card>();
-        foreach (var sc in serverCards) {
+        foreach (var sc in serverCards)
+        {
             clientCards.Add(ConvertServerCardToClientCard(sc));
         }
         return clientCards;
     }
 
     // 【輔助方法】將單個伺服器卡牌轉換為客戶端卡牌
-    public Card ConvertServerCardToClientCard(ServerCard serverCard) {
+    public Card ConvertServerCardToClientCard(ServerCard serverCard)
+    {
         if (serverCard == null) return null;
         // 你需要一個機制來從卡牌數據 (例如 serverCard.name 或 serverCard.id) 找到對應的 Sprite
         // 這裡僅作轉換，Sprite 需要額外處理
         Sprite cardSprite = UIManager.GetCardSpriteByName(serverCard.name); // 假設 UIManager 有此方法
 
-        return new Card {
+        return new Card
+        {
             id = serverCard.id,//string.IsNullOrEmpty(serverCard.id) ? Random.Range(1000,9999) : Animator.StringToHash(serverCard.id), // 客戶端 ID 可以重新生成或使用伺服器 ID 的 Hash
             name = serverCard.name,
             cost = serverCard.cost,
@@ -590,29 +979,40 @@ public class GameManager : MonoBehaviour
     }
 
     // 【新增】玩家請求創建房間
-    public void RequestCreateRoom(string playerName) {
-        if (currentGameMode == GameMode.OnlineMultiplayerRoom && wsManager != null && wsManager.IsConnected()) {
+    public void RequestCreateRoom(string playerName)
+    {
+        if (currentGameMode == GameMode.OnlineMultiplayerRoom && wsManager != null && wsManager.IsConnected())
+        {
             wsManager.SendCreateRoomRequest(playerName);
-        } else {
+        }
+        else
+        {
             Debug.LogError("Cannot create room: Not in room mode or not connected.");
         }
     }
 
     // 【新增】玩家請求加入房間
-    public void RequestJoinRoom(string targetRoomId, string playerName) {
-        if (string.IsNullOrEmpty(targetRoomId)) {
+    public void RequestJoinRoom(string targetRoomId, string playerName)
+    {
+        if (string.IsNullOrEmpty(targetRoomId))
+        {
             UIManager.UpdateRoomStatus("錯誤：房間ID不能為空！");
             return;
         }
-        if (currentGameMode == GameMode.OnlineMultiplayerRoom && wsManager != null && wsManager.IsConnected()) {
+        if (currentGameMode == GameMode.OnlineMultiplayerRoom && wsManager != null && wsManager.IsConnected())
+        {
             wsManager.SendJoinRoomRequest(targetRoomId, playerName);
-        } else {
+        }
+        else
+        {
             Debug.LogError("Cannot join room: Not in room mode or not connected.");
         }
     }
-     // 【新增】玩家請求離開房間
-    public void RequestLeaveRoom() {
-        if (IsInRoom && wsManager != null && wsManager.IsConnected()) {
+    // 【新增】玩家請求離開房間
+    public void RequestLeaveRoom()
+    {
+        if (IsInRoom && wsManager != null && wsManager.IsConnected())
+        {
             wsManager.SendLeaveRoomRequest(RoomId);
             // 離開房間後的狀態清理，例如重置 IsInRoom 等，可以在收到伺服器 leftRoom 確認後進行
         }
@@ -620,11 +1020,14 @@ public class GameManager : MonoBehaviour
 
 
     // 【新增】當 WebSocket 連接成功時由 WebSocketManager 調用
-    public void OnWebSocketConnected() {
+    public void OnWebSocketConnected()
+    {
         Debug.Log("GameManager: WebSocket Connected.");
-        if (UIManager != null) {
+        if (UIManager != null)
+        {
             UIManager.HideConnectingMessage();
-            if (currentGameMode == GameMode.OnlineMultiplayerRoom && !IsInRoom) {
+            if (currentGameMode == GameMode.OnlineMultiplayerRoom && !IsInRoom)
+            {
                 UIManager.SetRoomPanelActive(true); // 連接成功後，如果是房間模式且還沒在房間裡，顯示房間面板
                 UIManager.UpdateRoomStatus("已連接到房間伺服器。\n請創建或加入房間。");
             }
@@ -632,10 +1035,13 @@ public class GameManager : MonoBehaviour
     }
 
     // 【新增】當 WebSocket 連接失敗或斷開時由 WebSocketManager 調用
-    public void OnWebSocketDisconnected(string reason) {
+    public void OnWebSocketDisconnected(string reason)
+    {
         Debug.LogWarning($"GameManager: WebSocket Disconnected. Reason: {reason}");
-        if (UIManager != null) {
-            if (currentGameMode == GameMode.OnlineSinglePlayerAI || currentGameMode == GameMode.OnlineMultiplayerRoom) {
+        if (UIManager != null)
+        {
+            if (currentGameMode == GameMode.OnlineSinglePlayerAI || currentGameMode == GameMode.OnlineMultiplayerRoom)
+            {
                 UIManager.ShowConnectingMessage($"連接已斷開: {reason}\n請檢查網絡並嘗試返回主選單重連。");
                 // 可以考慮彈出一個返回主選單的按鈕
             }
@@ -650,7 +1056,8 @@ public class GameManager : MonoBehaviour
 // 【新增】用於接收伺服器遊戲狀態的輔助類 (需要與後端 GameMessage 中的 data 結構對應)
 // 這些結構需要根據你後端實際發送的 JSON 結構來定義
 [System.Serializable]
-public class ServerGameState {
+public class ServerGameState
+{
     public string playerId; // 當前玩家的ID (在AI模式中) 或房間中某個玩家的ID
     public int playerHealth;
     public int playerMana;
@@ -674,7 +1081,8 @@ public class ServerGameState {
 }
 
 [System.Serializable]
-public class ServerPlayerState { // 用於房間模式中表示一個玩家的公開狀態
+public class ServerPlayerState
+{ // 用於房間模式中表示一個玩家的公開狀態
     public string playerId;
     public int health;
     public int mana;
@@ -697,7 +1105,8 @@ public class ServerCard
 }
 
 [System.Serializable]
-public class ServerRoomState { // 用於接收房間更新
+public class ServerRoomState
+{ // 用於接收房間更新
     public string roomId;
     public Dictionary<string, string> players; // <playerId, playerName>
     public bool gameStarted;

@@ -4,7 +4,7 @@ using System; // 【新增】為了 Action
 using System.Collections.Generic; // 【新增】為了 Dictionary
 using Newtonsoft.Json; // 【新增】或者使用 Unity 的 JsonUtility，但 Newtonsoft 更強大，需要匯入對應的 DLL 或透過 Package Manager 安裝
 // 如果使用 JsonUtility，則 GameMessage 和其嵌套類別需要是 [System.Serializable] 且欄位都是 public
-
+public delegate void MessageHandlerDelegate(object data);
 public class WebSocketManager : MonoBehaviour
 {
     private WebSocket ws;
@@ -17,6 +17,7 @@ public class WebSocketManager : MonoBehaviour
     private bool isConnecting = false; // 【新增】防止重複連接
     private bool intentionallyClosed = false; // 【新增】標識是否為刻意關閉
 
+    private Dictionary<string, MessageHandlerDelegate> _messageHandlers = new Dictionary<string, MessageHandlerDelegate>();
     // 【新增】連接到指定的伺服器 URL
     public async void ConnectToServer(string serverUrl)
     {
@@ -96,7 +97,20 @@ public class WebSocketManager : MonoBehaviour
             });
         }
     }
-
+    // 由 GameManager 或其他呼叫來註冊處理器
+    public void RegisterMessageHandler(string messageType, MessageHandlerDelegate handler)
+    {
+        if (!_messageHandlers.ContainsKey(messageType))
+        {
+            _messageHandlers.Add(messageType, handler);
+        }
+        else
+        {
+            // 可以選擇更新或拋出錯誤/警告
+            _messageHandlers[messageType] = handler;
+            Debug.LogWarning($"MessageHandler for type '{messageType}' was overwritten.");
+        }
+    }
     private string ResolveCloseCode(WebSocketCloseCode closeCode)
     {
         switch (closeCode)
@@ -131,103 +145,17 @@ public class WebSocketManager : MonoBehaviour
                 Debug.LogError("Failed to parse base GameMessage or type is missing.");
                 return;
             }
-
-            // 根據 type 進一步處理 data 部分
-            // GameManager 中定義的 ServerGameState, ServerCard 等類別需要與後端 JSON 結構匹配
-            switch (baseMessage.type)
+            // 4. 從字典中查找並執行處理函式
+            if (_messageHandlers.TryGetValue(baseMessage.type, out MessageHandlerDelegate handler))
             {
-                case "gameStart": // AI 模式的開始
-                    ServerGameState gameStartState = JsonConvert.DeserializeObject<ServerGameState>(baseMessage.data.ToString());
-                    GameManager.Instance.HandleGameStartFromServer(gameStartState);
-                    break;
-                case "gameStateUpdate": // AI 模式或房間模式的通用狀態更新
-                    ServerGameState gameState = JsonConvert.DeserializeObject<ServerGameState>(baseMessage.data.ToString());
-                    GameManager.Instance.HandleGameStateUpdateFromServer(gameState);
-                    break;
-                case "roomUpdate": // 房間模式的狀態更新 (可能包含遊戲開始、玩家加入等)
-                    ServerRoomState roomState = JsonConvert.DeserializeObject<ServerRoomState>(baseMessage.data.ToString());
-                    GameManager.Instance.HandleRoomUpdateFromServer(roomState);
-                    break;
-                case "aiAction": // AI 的行動
-                    // aiAction 的 data 結構可能包含 actionType ("playCard", "endTurn") 和卡牌信息
-                    // 例如: {"actionType": "playCard", "card": {"id":"...", "name":"..."}}
-                    var aiActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(baseMessage.data.ToString());
-                    if (aiActionData.TryGetValue("actionType", out object aiActionType) && aiActionType.ToString() == "playCard")
-                    {
-                        if (aiActionData.TryGetValue("card", out object cardObj))
-                        {
-                            ServerCard aiCard = JsonConvert.DeserializeObject<ServerCard>(cardObj.ToString());
-                            GameManager.Instance.HandleAIPlayCard(aiCard);
-                        }
-                    }
-                    // 如果是 "endTurn"，可能不需要額外處理卡牌，gameStateUpdate 會處理後續
-                    break;
-                case "opponentPlayCard": // 房間模式中，對手出牌的單獨通知 (如果後端這樣設計)
-                    var opponentPlayData = JsonConvert.DeserializeObject<Dictionary<string, object>>(baseMessage.data.ToString());
-                    if (opponentPlayData.TryGetValue("card", out object cardData) &&
-                        opponentPlayData.TryGetValue("playerName", out object playerNameObj))
-                    {
-                        ServerCard playedCard = JsonConvert.DeserializeObject<ServerCard>(cardData.ToString());
-                        GameManager.Instance.HandleOpponentPlayCard(playedCard, playerNameObj.ToString());
-                    }
-                    break;
-                case "roomCreated":
-                    Debug.Log($"Room created: {baseMessage.roomId}, Message: {baseMessage.message}");
-                    GameManager.Instance.RoomId = baseMessage.roomId; // GameManager 也記錄一下
-                    GameManager.Instance.IsInRoom = true; // 標識已在房間內
-                     // UIManager 可以更新UI顯示房間ID，並隱藏創建/加入按鈕，顯示等待訊息或離開按鈕
-                    if(GameManager.Instance.UIManager != null) {
-                        GameManager.Instance.UIManager.UpdateRoomStatus($"房間創建成功！\n房間ID: {baseMessage.roomId}\n等待對手加入...");
-                        GameManager.Instance.UIManager.SetRoomPanelActive(true); // 確保房間面板可見以顯示狀態和離開按鈕
-                        GameManager.Instance.UIManager.ToggleRoomJoinCreateButtons(false); // 隱藏創建和加入按鈕
-                    }
-                    break;
-                case "roomJoined":
-                    Debug.Log($"Joined room: {baseMessage.roomId}, Message: {baseMessage.message}");
-                    GameManager.Instance.RoomId = baseMessage.roomId;
-                    GameManager.Instance.IsInRoom = true;
-                    // UIManager 更新UI
-                     if(GameManager.Instance.UIManager != null) {
-                        GameManager.Instance.UIManager.UpdateRoomStatus($"成功加入房間: {baseMessage.roomId}");
-                        // 伺服器的 roomUpdate 應該會緊接著發送完整的房間狀態
-                    }
-                    break;
-                case "leftRoom": // 【新增】處理離開房間的確認
-                    Debug.Log($"Left room: {baseMessage.message}");
-                    GameManager.Instance.RoomId = null;
-                    GameManager.Instance.IsInRoom = false;
-                    if(GameManager.Instance.UIManager != null) {
-                        GameManager.Instance.UIManager.UpdateRoomStatus("您已離開房間。");
-                        GameManager.Instance.UIManager.SetRoomPanelActive(GameManager.Instance.CurrentGameMode == GameManager.GameMode.OnlineMultiplayerRoom); // 如果還在房間模式，顯示房間面板
-                        GameManager.Instance.UIManager.ToggleRoomJoinCreateButtons(true); // 重新顯示創建和加入按鈕
-                    }
-                    break;
-                case "error":
-                    Debug.LogError("Server error: " + baseMessage.message);
-                    if (GameManager.Instance.UIManager != null)
-                    {
-                        // 可以顯示一個通用的錯誤提示UI
-                        GameManager.Instance.UIManager.ShowErrorPopup(baseMessage.message);
-                    }
-                    break;
-                // 【新增或確認】處理伺服器確認玩家行動的訊息
-                case "playerAction": // 假設伺服器用這個 type 來確認玩家出牌成功
-                    var playerActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(baseMessage.data.ToString());
-                    if (playerActionData.TryGetValue("action", out object playerActionType) && playerActionType.ToString() == "playCard" &&
-                        playerActionData.TryGetValue("success", out object successObj) && (bool)successObj == true)
-                    {
-                        if (playerActionData.TryGetValue("cardId", out object cardIdObj))
-                        {
-                            string playedCardId = cardIdObj.ToString();
-                            Debug.Log($"WebSocketManager: Received playerAction confirmation for cardId: {playedCardId}");
-                            GameManager.Instance.HandlePlayerCardPlayConfirmed(playedCardId);
-                        }
-                    }
-                    // 你可能還需要處理 actionType 為 "endTurn" 等其他玩家行動
-                    break;
-                default:
-                    Debug.LogWarning("Received unhandled message type: " + baseMessage.type);
-                    break;
+                // baseMessage.data 已經是 object 類型，可以直接傳遞
+                // 處理函式內部需要負責將 object data 轉換為預期的具體類型
+                handler.Invoke(baseMessage.data);
+            }
+            else
+            {
+                // 原本 switch 中的 default 行為
+                Debug.LogWarning("Received unhandled message type: " + baseMessage.type); //
             }
             OnMessageReceivedEvent?.Invoke(baseMessage); // 觸發通用事件
         }

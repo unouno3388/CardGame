@@ -21,11 +21,13 @@ public class UIManager : MonoBehaviour
     public Text gameOverText;
     public Image playerHealthBar; // 玩家生命條
     public Image opponentHealthBar; // 對手生命條
+    [Header("下回合按鈕")]
+    public Button nextTurnButton; // 下一回合按鈕
     [Header("卡牌預置體")]
     public GameObject cardPrefab;
     [Header("卡牌間距")]
     public float cardSpacing = 10f;
-
+    [Header("房間系統 UI 元素引用")]
     // 【新增】房間 UI 元素引用
     public GameObject roomPanel; // 整個房間控制面板
     public InputField roomIdInputField; // 輸入房間ID的輸入框
@@ -53,6 +55,18 @@ public class UIManager : MonoBehaviour
         EnsureLayoutGroup(opponentHandPanel); //
         EnsureLayoutGroup(playerFieldPanel); //
         EnsureLayoutGroup(opponentFieldPanel); //
+
+        //添加對下一回合按鈕的監聽器
+        if (nextTurnButton != null)
+        {
+            nextTurnButton.onClick.AddListener(() =>
+            {
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.EndTurn();
+                }
+            });
+        }
 
         // 【新增】為房間按鈕添加監聽器
         if (createRoomButton != null) createRoomButton.onClick.AddListener(OnCreateRoomClicked);
@@ -285,27 +299,27 @@ public class UIManager : MonoBehaviour
         // Debug.LogWarning($"GetCardSpriteByName: Sprite for '{cardName}' not implemented yet. Returning null.");
         return null; // 暫時返回 null
     }
-        public GameObject FindPlayerHandCardObjectById(string cardId) {
-        foreach (var cardObj in playerHandCardObjects) { // 假設 playerHandCardObjects 是最新的
-            if (cardObj != null) {
-                CardUI cui = cardObj.GetComponent<CardUI>();
-                if (cui != null && cui.card != null && cui.card.id == cardId) {
-                    return cardObj;
-                }
+    public GameObject FindPlayerHandCardObjectById(string cardId) {
+    foreach (var cardObj in playerHandCardObjects) { // 假設 playerHandCardObjects 是最新的
+        if (cardObj != null) {
+            CardUI cui = cardObj.GetComponent<CardUI>();
+            if (cui != null && cui.card != null && cui.card.id == cardId) {
+                return cardObj;
             }
         }
-        // 如果 playerHandCardObjects 不是最新的，或者作為備用方案，可以遍歷 panel 的子物件
-        // Debug.LogWarning($"UIManager: Card with ID {cardId} not found in playerHandCardObjects tracking list. Trying direct panel search (less efficient).");
-        // foreach (Transform child in playerHandPanel) {
-        //     if (child == null) continue;
-        //     CardUI cui = child.GetComponent<CardUI>();
-        //     if (cui != null && cui.card != null && cui.card.id == cardId) {
-        //         return child.gameObject;
-        //     }
-        // }
-        Debug.LogWarning($"UIManager: Card with ID {cardId} not found in player's hand UI for animation.");
-        return null;
     }
+    // 如果 playerHandCardObjects 不是最新的，或者作為備用方案，可以遍歷 panel 的子物件
+    // Debug.LogWarning($"UIManager: Card with ID {cardId} not found in playerHandCardObjects tracking list. Trying direct panel search (less efficient).");
+    // foreach (Transform child in playerHandPanel) {
+    //     if (child == null) continue;
+    //     CardUI cui = child.GetComponent<CardUI>();
+    //     if (cui != null && cui.card != null && cui.card.id == cardId) {
+    //         return child.gameObject;
+    //     }
+    // }
+    Debug.LogWarning($"UIManager: Card with ID {cardId} not found in player's hand UI for animation.");
+    return null;
+}
 
     public void PlayCardWithAnimation(Card card, bool isPlayer, GameObject cardObject, Transform sourcePanel, Transform targetPanel)
     {
