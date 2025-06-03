@@ -101,18 +101,18 @@ public class UIManager : MonoBehaviour
 
         GameManager gm = GameManager.Instance;
 
-        if (playerHealthText != null) playerHealthText.text = "玩家生命: " + gm.playerHealth;
-        if (opponentHealthText != null) opponentHealthText.text = "對手生命: " + gm.opponentHealth;
-        if (playerManaText != null) playerManaText.text = "法力: " + gm.playerMana + "/" + gm.maxMana;
-        if (playerHealthBar != null) playerHealthBar.fillAmount = gm.playerHealth / 30f;//(float)gm.maxHealth;
-        if (opponentHealthBar != null) opponentHealthBar.fillAmount = gm.opponentHealth / 30f;//(float)gm.maxHealth;
+        if (playerHealthText != null) playerHealthText.text = "玩家生命: " + gm.CurrentState.PlayerHealth;
+        if (opponentHealthText != null) opponentHealthText.text = "對手生命: " + gm.CurrentState.OpponentHealth;
+        if (playerManaText != null) playerManaText.text = "法力: " + gm.CurrentState.PlayerMana + "/" + gm.CurrentState.MaxMana;
+        if (playerHealthBar != null) playerHealthBar.fillAmount = gm.CurrentState.PlayerHealth / 30f;//(float)gm.maxHealth;
+        if (opponentHealthBar != null) opponentHealthBar.fillAmount = gm.CurrentState.OpponentHealth / 30f;//(float)gm.maxHealth;
         // 【新增】顯示對手（AI或線上玩家）的法力（如果遊戲設計如此）
         if (opponentManaText != null) {
             if (gm.CurrentGameMode == GameManager.GameMode.OfflineSinglePlayer ||
                 gm.CurrentGameMode == GameManager.GameMode.OnlineSinglePlayerAI ||
-                (gm.CurrentGameMode == GameManager.GameMode.OnlineMultiplayerRoom && gm.IsInRoom && gm.OpponentPlayerId != null)) // 確保在房間且有對手
+                (gm.CurrentGameMode == GameManager.GameMode.OnlineMultiplayerRoom && gm.IsInRoom && gm.CurrentState.OpponentPlayerId != null)) // 確保在房間且有對手
             {
-                opponentManaText.text = "對手法力: " + gm.opponentMana + "/" + gm.opponentMaxMana;
+                opponentManaText.text = "對手法力: " + gm.CurrentState.OpponentMana + "/" + gm.CurrentState.OpponentMaxMana;
                 opponentManaText.gameObject.SetActive(true);
             } else {
                 opponentManaText.gameObject.SetActive(false); // 其他情況下隱藏
@@ -120,18 +120,18 @@ public class UIManager : MonoBehaviour
         }
 
 
-        UpdateHand(gm.playerHand, playerHandPanel, true, playerHandCardObjects);
+        UpdateHand(gm.CurrentState.PlayerHand, playerHandPanel, true, playerHandCardObjects);
 
         // 【修改】對手手牌的處理
         // 【修改】對手手牌的處理，針對 OnlineSinglePlayerAI
         if (gm.CurrentGameMode == GameManager.GameMode.OfflineSinglePlayer)
         {
-            UpdateHand(gm.opponentHand, opponentHandPanel, false, opponentHandCardObjects); // 離線AI顯示實際手牌（通常是卡背）
+            UpdateHand(gm.CurrentState.OpponentHand, opponentHandPanel, false, opponentHandCardObjects); // 離線AI顯示實際手牌（通常是卡背）
         }
         else if (gm.CurrentGameMode == GameManager.GameMode.OnlineSinglePlayerAI)
         {
             // 線上AI模式，根據數量顯示卡背
-            UpdateOpponentHandOnlineAI(gm.opponentServerHandCount, opponentHandPanel, opponentHandCardObjects);
+            UpdateOpponentHandOnlineAI(gm.CurrentState.OpponentServerHandCount, opponentHandPanel, opponentHandCardObjects);
         }
         else if (gm.CurrentGameMode == GameManager.GameMode.OnlineMultiplayerRoom) // 線上房間模式
         {
@@ -145,8 +145,8 @@ public class UIManager : MonoBehaviour
         }
 
 
-        UpdateField(gm.playerField, playerFieldPanel, true, playerFieldCardObjects);
-        UpdateField(gm.opponentField, opponentFieldPanel, false, opponentFieldCardObjects);
+        UpdateField(gm.CurrentState.PlayerField, playerFieldPanel, true, playerFieldCardObjects);
+        UpdateField(gm.CurrentState.OpponentField, opponentFieldPanel, false, opponentFieldCardObjects);
 
         // 更新房間按鈕的顯示狀態
         if (roomPanel != null && roomPanel.activeSelf) {

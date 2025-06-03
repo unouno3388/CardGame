@@ -169,7 +169,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         }
 
         GameManager gm = GameManager.Instance;
-        if (!gm.isPlayerTurn) {
+        if (!gm.CurrentState.IsPlayerTurn) {
             Debug.Log("Not your turn!");
             return;
         }
@@ -180,7 +180,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
 
         if (gm.CurrentGameMode == GameManager.GameMode.OfflineSinglePlayer)
         {
-            if (gm.playerMana >= card.cost)
+            if (gm.CurrentState.PlayerMana >= card.cost)
             {
                 gm.CardPlayService.PlayCard(card, true, gameObject); //
             }
@@ -193,9 +193,9 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         else if (gm.CurrentGameMode == GameManager.GameMode.OnlineSinglePlayerAI ||
                  gm.CurrentGameMode == GameManager.GameMode.OnlineMultiplayerRoom)
         {
-            if (gm.playerMana >= card.cost)
+            if (gm.CurrentState.PlayerMana >= card.cost)
             {
-                gm.WebSocketManager.SendPlayCardRequest(card.id.ToString(), gm.RoomId); //
+                gm.WebSocketManager.SendPlayCardRequest(card.id.ToString(), gm.CurrentState.RoomId); //
                 Debug.Log($"Sent PlayCard request for card: {card.name} (ID: {card.id})");
             }
             else
@@ -211,7 +211,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
         // 複製您 CardUI.cs 中最新的 OnPointerEnter 內容
         if (!isFieldCard && isPlayerCard && artworkImage != null && // artworkImage 是您在 CardUI 中定義的
             (CardAnimationManager.Instance == null || !CardAnimationManager.Instance.IsAnimationPlaying()) &&
-            GameManager.Instance != null && GameManager.Instance.isPlayerTurn)
+            GameManager.Instance != null && GameManager.Instance.CurrentState.IsPlayerTurn)
         {
             Debug.Log("y = "+originalPosition.y + 1f);
             transform.DOScale(originalScale * 1.5f, 0.2f).SetEase(Ease.OutQuad);

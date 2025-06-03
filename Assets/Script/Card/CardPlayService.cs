@@ -57,7 +57,13 @@ public class CardPlayService : MonoBehaviour
         if (gameManager.CurrentGameMode == GameManager.GameMode.OfflineSinglePlayer)
         {
             // 回合檢查 (離線)
-            if (isPlayer && !gameManager.isPlayerTurn)
+            if (isPlayer && !gameManager.CurrentState.IsPlayerTurn)
+            {
+                Debug.LogWarning("Not player's turn (Offline)!");
+                CardAnimationManager.Instance.SetAnimationPlaying(false); // 重置動畫標誌
+                return;
+            }
+            else if (!isPlayer && gameManager.CurrentState.IsPlayerTurn)
             {
                 Debug.LogWarning("Not player's turn (Offline)!");
                 CardAnimationManager.Instance.SetAnimationPlaying(false); // 重置動畫標誌
@@ -65,7 +71,7 @@ public class CardPlayService : MonoBehaviour
             }
 
             // 法力值檢查 (離線)
-            int currentMana = isPlayer ? gameManager.playerMana : gameManager.opponentMana;
+            int currentMana = isPlayer ? gameManager.CurrentState.PlayerMana : gameManager.CurrentState.OpponentMana;
             if (currentMana < card.cost)
             {
                 Debug.LogWarning($"Not enough mana for {(isPlayer ? "player" : "opponent")} (Offline)! Current: {currentMana}, Required: {card.cost}");
@@ -76,15 +82,16 @@ public class CardPlayService : MonoBehaviour
             // 從手牌中移除卡牌並消耗法力值 (離線)
             if (isPlayer)
             {
-                gameManager.playerHand.Remove(card);
-                gameManager.playerMana -= card.cost;
+                gameManager.CurrentState.PlayerHand.Remove(card);
+                gameManager.CurrentState.PlayerMana -= card.cost;
             }
             else // AI (離線)
             {
-                gameManager.opponentHand.Remove(card);
-                gameManager.opponentMana -= card.cost;
+                gameManager.CurrentState.OpponentHand.Remove(card);
+                gameManager.CurrentState.OpponentMana -= card.cost;
             }
-            Debug.Log($"{(isPlayer ? "Player" : "Opponent")} played {card.name} (Offline). Mana after: {(isPlayer ? gameManager.playerMana : gameManager.opponentMana)}.");
+            Debug.Log($"{(isPlayer ? "Player" : "Opponent")} played {card.name} (Offline). Mana after: "+
+            $"{(isPlayer ? gameManager.CurrentState.PlayerMana : gameManager.CurrentState.OpponentMana)}.");
 
             // 處理動畫和效果 (離線)
             if (cardObject != null && uiManager != null) // 確保 cardObject 和 uiManager 有效
@@ -129,8 +136,8 @@ public class CardPlayService : MonoBehaviour
                 } else {
                      Debug.LogWarning($"PlayCard (Online Opponent): cardObject for {card.name} is null or UIManager missing. Cannot play animation. Card should appear on field via UIUpdate.");
                      // 即使沒有動畫，也確保卡牌數據被加入到場地列表（如果還沒被加入的話），等待 UIManager.UpdateUI() 渲染
-                     if (!gameManager.opponentField.Contains(card)) { // 簡單檢查避免重複添加
-                        gameManager.opponentField.Add(card);
+                     if (!gameManager.CurrentState.OpponentField.Contains(card)) { // 簡單檢查避免重複添加
+                        gameManager.CurrentState.OpponentField.Add(card);
                      }
                      if (uiManager != null) uiManager.UpdateUI(); // 確保UI刷新
                 }

@@ -59,7 +59,8 @@ public class CardAnimationManager : MonoBehaviour
         else
         {
             Canvas mainCanvas = FindObjectOfType<Canvas>();
-            if (mainCanvas != null) {
+            if (mainCanvas != null)
+            {
                 GameObject animContainerObj = new GameObject("DynamicAnimationContainer_CAM");
                 animContainerObj.transform.SetParent(mainCanvas.transform, false);
                 RectTransform rect = animContainerObj.AddComponent<RectTransform>();
@@ -69,7 +70,9 @@ public class CardAnimationManager : MonoBehaviour
                 rect.offsetMax = Vector2.zero;
                 animationCanvasTransform = rect;
                 Debug.LogWarning("CardAnimationManager: UIManager.animationContainer not set. Created a dynamic container under Canvas.");
-            } else {
+            }
+            else
+            {
                 animationCanvasTransform = transform;
                 Debug.LogError("CardAnimationManager: Could not find UIManager.animationContainer or a Canvas to create a dynamic container!");
             }
@@ -139,7 +142,8 @@ public class CardAnimationManager : MonoBehaviour
         Vector3 originalCardScale = rect.localScale; // 卡牌在動畫層的初始（通常是手牌中的）大小
 
         // 1. 放大效果
-        seq.Append(rect.DOScale(originalCardScale * enlargeScaleFactor, enlargeDuration).SetEase(enlargeEase).OnUpdate(() => {
+        seq.Append(rect.DOScale(originalCardScale * enlargeScaleFactor, enlargeDuration).SetEase(enlargeEase).OnUpdate(() =>
+        {
             if (cardObject == null) wasDestroyedDuringAnimation = true;
         }));
 
@@ -151,7 +155,8 @@ public class CardAnimationManager : MonoBehaviour
 
         // 3. 移動到目標位置
         //    在移動的同時，可以選擇是否讓它逐漸縮小回接近原始大小（如果卡牌要留在場上）
-        Tweener moveTween = rect.DOMove(targetPanel.position, moveToTargetDuration).SetEase(moveToTargetEase).OnUpdate(() => {
+        Tweener moveTween = rect.DOMove(targetPanel.position, moveToTargetDuration).SetEase(moveToTargetEase).OnUpdate(() =>
+        {
             if (cardObject == null) wasDestroyedDuringAnimation = true;
         });
         seq.Append(moveTween);
@@ -183,7 +188,7 @@ public class CardAnimationManager : MonoBehaviour
                             Debug.Log($"CardAnimationManager: Activated cardDetailsContainer for {card.name}");
                         }
                         // 確保文字內容正確，Initialize應該已經做過，但以防萬一
-                         cardUIComponent.Initialize(card, isPlayer, true); // isField 應為 true 因為它到了場上
+                        cardUIComponent.Initialize(card, isPlayer, true); // isField 應為 true 因為它到了場上
                     }
                 }));
             seq.Append(rect.DORotate(Vector3.zero, flipToOriginalDuration));
@@ -211,15 +216,16 @@ public class CardAnimationManager : MonoBehaviour
         // 如果是放到場上且不消失的牌，在淡出前應恢復其正常大小
         if (scaleDownDuringMove == false && enlargeScaleFactor > 1.0f) // 如果移動時沒縮小，且之前放大了
         {
-             // 可以選擇在淡出前，或者如果牌不淡出，就直接設置為最終大小
-             // seq.Append(rect.DOScale(originalCardScale, 0.1f)); // 快速恢復
+            // 可以選擇在淡出前，或者如果牌不淡出，就直接設置為最終大小
+            // seq.Append(rect.DOScale(originalCardScale, 0.1f)); // 快速恢復
         }
 
-        seq.Append(cardCanvasGroup.DOFade(0, fadeOutDuration).OnUpdate(() => {
-             if (cardObject == null) wasDestroyedDuringAnimation = true;
+        seq.Append(cardCanvasGroup.DOFade(0, fadeOutDuration).OnUpdate(() =>
+        {
+            if (cardObject == null) wasDestroyedDuringAnimation = true;
         }));
 
-        
+
         seq.OnComplete(() =>
         {
             onComplete?.Invoke(); //Onkill 會重複在執行一次
@@ -234,12 +240,15 @@ public class CardAnimationManager : MonoBehaviour
             SetAnimationPlaying(false);
         });
 
-        seq.OnKill(() => {
-            if (!wasDestroyedDuringAnimation) {
-                 onComplete?.Invoke();
+        seq.OnKill(() =>
+        {
+            if (!wasDestroyedDuringAnimation)
+            {
+                onComplete?.Invoke();
             }
             SetAnimationPlaying(false);
-            if (!wasDestroyedDuringAnimation && cardObject != null) {
+            if (!wasDestroyedDuringAnimation && cardObject != null)
+            {
                 // Destroy(cardObject);
             }
         });
