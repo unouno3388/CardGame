@@ -24,7 +24,7 @@ public class GameState : IGameState
     public bool IsInRoom { get; set; }
     public string OpponentPlayerId { get; set; }
     public GameManager.GameMode CurrentGameMode { get; set; }
-
+    public bool GameStarted { get; set; }
     public void ResetState(GameManager.GameMode mode)
     {
         CurrentGameMode = mode;
@@ -46,6 +46,7 @@ public class GameState : IGameState
 
         // PlayerId 在連接成功後設定
         // RoomId, IsInRoom, OpponentPlayerId 在房間相關操作後設定
+        GameStarted = false;
         IsInRoom = false;
         RoomId = null;
         OpponentPlayerId = null;
@@ -74,6 +75,11 @@ public class GameState : IGameState
         if (initialState.aiField != null)
         {
             OpponentField.AddRange(converter.ConvertServerCardsToClientCards(initialState.aiField, uiManager));
+        }
+        
+        if (initialState != null) // 確保 initialState 不是 null
+        {
+            GameStarted = initialState.gameStarted; // 假設 ServerGameState 有 gameStarted 欄位
         }
         Debug.Log($"GameState: Updated from GameStartServer. PlayerId: {PlayerId}, IsPlayerTurn: {IsPlayerTurn}");
     }
@@ -119,28 +125,92 @@ public class GameState : IGameState
         }
 
         IsPlayerTurn = updatedState.isPlayerTurn;
+        if (updatedState != null)
+        {
+            GameStarted = updatedState.gameStarted; // 假設 ServerGameState 有 gameStarted 欄位
+        }
         Debug.Log($"GameState: Updated from ServerGameState. PlayerHealth: {PlayerHealth}, IsPlayerTurn: {IsPlayerTurn}");
     }
 
-    public void UpdateFromRoomStateServer(ServerRoomState roomState, IDataConverter converter, UIManager uiManager, string localPlayerId)
+    // In GameState.cs
+    public void UpdateFromRoomStateServer(ServerRoomState roomState, IDataConverter converter, UIManager uiManager, string localPlayerIdArgument) // 重命名參數以區分
     {
-        RoomId = roomState.roomId;
-        IsInRoom = true; // 假設收到 RoomState 就是在房間內
-        IsPlayerTurn = (roomState.currentPlayerId == localPlayerId);
+        Debug.Log($"[PlayerB-GS] UpdateFromRoomStateServer: localPlayerIdArg='{localPlayerIdArgument}', roomState.self.id='{roomState.self?.playerId}', roomState.gameStarted={roomState.gameStarted}");
 
-        if (roomState.self != null && roomState.self.playerId == localPlayerId)
+        if (roomState == null) {
+            Debug.LogError("[PlayerB-GS] roomState is null. Aborting update.");
+            return;
+        }
+
+        RoomId = roomState.roomId;
+        IsInRoom = true;
+        GameStarted = roomState.gameStarted;
+        CurrentGameMode = GameManager.GameMode.OnlineMultiplayerRoom;
+
+        // 更新 self (本地玩家) 的狀態
+        if (roomState.self != null)
         {
+            // 將本地 PlayerId 更新為伺服器告知的 self.playerId
+            // 這是最權威的ID
+            if (!string.IsNullOrEmpty(roomState.self.playerId))
+            {
+                this.PlayerId = roomState.self.playerId;
+                Debug.Log($"[PlayerB-GS] Updated/Set this.PlayerId to: '{this.PlayerId}' from roomState.self.playerId.");
+            }
+            else
+            {
+                Debug.LogWarning("[PlayerB-GS] roomState.self.playerId is null or empty. Cannot definitively update local PlayerId for self.");
+                // 如果 localPlayerIdArgument 有值且 this.PlayerId 仍為空，可以考慮使用它作為備選，但伺服器的 self.playerId 優先
+                if (string.IsNullOrEmpty(this.PlayerId) && !string.IsNullOrEmpty(localPlayerIdArgument)) {
+                    this.PlayerId = localPlayerIdArgument;
+                    Debug.Log($"[PlayerB-GS] Using localPlayerIdArgument ('{localPlayerIdArgument}') as fallback for this.PlayerId.");
+                }
+            }
+
+            // 現在 this.PlayerId 應該是正確的了，或者至少是目前最佳的猜測。
+            // 直接使用 roomState.self 的數據來更新本地玩家狀態，因為 "self" 就是指這個客戶端。
             PlayerHealth = roomState.self.health;
             PlayerMana = roomState.self.mana;
             MaxMana = roomState.self.maxMana;
+
             PlayerHand.Clear();
-            if (roomState.self.hand != null) // 假設 self 包含完整手牌
+            if (roomState.self.hand != null)
             {
-                PlayerHand.AddRange(converter.ConvertServerCardsToClientCards(roomState.self.hand, uiManager));
+                Debug.Log($"[PlayerB-GS] Self hand from server has {roomState.self.hand.Count} cards before conversion for PlayerId: {this.PlayerId}.");
+                List<Card> clientCards = converter.ConvertServerCardsToClientCards(roomState.self.hand, uiManager);
+                PlayerHand.AddRange(clientCards);
+                Debug.Log($"[PlayerB-GS] Converted {clientCards.Count} client cards for self. Current PlayerHand count: {PlayerHand.Count} for PlayerId: {this.PlayerId}.");
             }
-            // PlayerField 的更新通常也包含在 self 裡，如果 ServerPlayerState 有 field 欄位
+            else
+            {
+                Debug.LogWarning($"[PlayerB-GS] roomState.self.hand is null for PlayerId: {this.PlayerId}.");
+            }
+
+            PlayerField.Clear();
+            if (roomState.self.field != null)
+            {
+                Debug.Log($"[PlayerB-GS] Self field from server has {roomState.self.field.Count} cards before conversion for PlayerId: {this.PlayerId}.");
+                List<Card> clientFieldCards = converter.ConvertServerCardsToClientCards(roomState.self.field, uiManager);
+                PlayerField.AddRange(clientFieldCards);
+                Debug.Log($"[PlayerB-GS] Converted {clientFieldCards.Count} client field cards for self. Current PlayerField count: {PlayerField.Count} for PlayerId: {this.PlayerId}.");
+            }
+            else
+            {
+                Debug.LogWarning($"[PlayerB-GS] roomState.self.field is null for PlayerId: {this.PlayerId}.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerB-GS] roomState.self is null. Cannot update self's state.");
+            // 如果 self 為 null，可能需要重置本地玩家的一些狀態或標記錯誤
+            PlayerHand.Clear();
+            PlayerField.Clear();
         }
 
+        // 在 PlayerId 被賦值後，再判斷回合歸屬
+        IsPlayerTurn = (!string.IsNullOrEmpty(roomState.currentPlayerId) && !string.IsNullOrEmpty(this.PlayerId) && roomState.currentPlayerId == this.PlayerId);
+
+        // 更新 opponent (對手) 的狀態
         if (roomState.opponent != null)
         {
             OpponentPlayerId = roomState.opponent.playerId;
@@ -148,20 +218,34 @@ public class GameState : IGameState
             OpponentMana = roomState.opponent.mana;
             OpponentMaxMana = roomState.opponent.maxMana;
             OpponentServerHandCount = roomState.opponent.handCount;
+
+            OpponentHand.Clear(); // 對手手牌列表在客戶端通常只用於顯示卡背
+
             OpponentField.Clear();
-            // 假設 opponent state 包含場地牌列表 (如果 ServerPlayerState 有 field 欄位)
-            // if (roomState.opponent.field != null) {
-            //     OpponentField.AddRange(converter.ConvertServerCardsToClientCards(roomState.opponent.field, uiManager));
-            // }
+            if (roomState.opponent.field != null)
+            {
+                Debug.Log($"[PlayerB-GS] Opponent field from server has {roomState.opponent.field.Count} cards before conversion for OpponentId: {OpponentPlayerId}.");
+                List<Card> clientOpponentFieldCards = converter.ConvertServerCardsToClientCards(roomState.opponent.field, uiManager);
+                OpponentField.AddRange(clientOpponentFieldCards);
+                Debug.Log($"[PlayerB-GS] Converted {clientOpponentFieldCards.Count} client field cards for opponent. Current OpponentField count: {OpponentField.Count} for OpponentId: {OpponentPlayerId}.");
+            }
+            else
+            {
+                Debug.LogWarning($"[PlayerB-GS] roomState.opponent.field is null for OpponentId: {OpponentPlayerId}.");
+            }
         }
         else
         {
-            OpponentPlayerId = null; // 對手可能尚未加入或已離開
-            // 可以根據需要重置對手狀態
+            OpponentPlayerId = null;
+            OpponentHealth = 0; OpponentMana = 0; OpponentMaxMana = 0;
+            OpponentServerHandCount = 0;
+            OpponentField.Clear(); OpponentHand.Clear();
+            Debug.LogWarning("[PlayerB-GS] roomState.opponent is null. Opponent state reset.");
         }
-        Debug.Log($"GameState: Updated from RoomStateServer. RoomId: {RoomId}, IsPlayerTurn: {IsPlayerTurn}");
-    }
 
+        Debug.Log($"GameState: Updated from RoomStateServer. RoomId: {RoomId}, IsPlayerTurn: {IsPlayerTurn}, PlayerHand Count: {PlayerHand.Count}, OpponentHand Count: {OpponentServerHandCount}");
+        Debug.Log($"[PlayerB-GS] After update: this.GameStarted={this.GameStarted}, this.PlayerId='{this.PlayerId}', PlayerHand.Count={PlayerHand.Count}");
+    }
 
     public void AddCardToPlayerHand(Card card) { PlayerHand.Add(card); }
     public void RemoveCardFromPlayerHand(string cardId) { PlayerHand.RemoveAll(c => c.id == cardId); }

@@ -140,6 +140,20 @@ public class CardAnimationManager : MonoBehaviour
 
         cardCanvasGroup.alpha = 1f;
         Vector3 originalCardScale = rect.localScale; // 卡牌在動畫層的初始（通常是手牌中的）大小
+        // 步驟 0 (僅對手出牌): 確保初始是卡背
+        if (!isPlayer) {
+            // 這裡應該已經將 cardUIComponent 設置為顯示卡背
+            // 例如，調用 cardUIComponent.ShowCardBack() 或類似方法
+            // 或者在 GameManager.HandleOpponentPlayCard 中創建臨時物件時就初始化為卡背
+            if (cardUIComponent.cardDetailsContainer != null) cardUIComponent.cardDetailsContainer.SetActive(false);
+            if (cardUIComponent.artworkImage != null && cardUIComponent.cardBackSprite != null) {
+                cardUIComponent.artworkImage.sprite = cardUIComponent.cardBackSprite;
+                cardUIComponent.artworkImage.gameObject.SetActive(true);
+            } else if (cardUIComponent.backgroundImage != null && cardUIComponent.cardBackSprite != null) { // 備用方案
+                cardUIComponent.backgroundImage.sprite = cardUIComponent.cardBackSprite;
+            }
+            Debug.Log($"[AnimManager] Opponent card '{card.name}' confirmed as card back for initial move.");
+        }
 
         // 1. 放大效果
         seq.Append(rect.DOScale(originalCardScale * enlargeScaleFactor, enlargeDuration).SetEase(enlargeEase).OnUpdate(() =>

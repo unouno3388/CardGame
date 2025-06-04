@@ -27,11 +27,14 @@ public class ServerGameState //
 public class ServerPlayerState //
 {
     public string playerId;
+    public string playerName; // 伺服器 PlayerGameState.toMapForClient 中已加入
     public int health;
     public int mana;
     public int maxMana;
-    public int handCount;
+    
     public List<ServerCard> hand; // 通常只有自己的手牌有完整列表，對手可能是空的或null
+    public int handCount;
+    public int deckSize;      // 牌庫剩餘數量
     public List<ServerCard> field; // 該玩家的場地牌
 }
 

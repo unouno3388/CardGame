@@ -27,7 +27,7 @@ public interface IGameState
     bool IsInRoom { get; set; }
     string OpponentPlayerId { get; set; }
     GameManager.GameMode CurrentGameMode { get; set; }
-
+     bool GameStarted { get; set; }
     // 方法
     void ResetState(GameManager.GameMode mode);
     void UpdateFromGameStartServer(ServerGameState initialState, IDataConverter converter, UIManager uiManager);

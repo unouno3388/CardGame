@@ -535,6 +535,7 @@ MonoBehaviour:
   nextTurnButton: {fileID: 1666548856}
   cardPrefab: {fileID: 1031228733670223655, guid: a5b0d87ca8a57054d9b7a276d6c2bd29, type: 3}
   cardSpacing: 150
+  gameplayPanel: {fileID: 0}
   roomPanel: {fileID: 602643886}
   roomIdInputField: {fileID: 1654577503}
   createRoomButton: {fileID: 1926354098}
@@ -603,6 +604,7 @@ MonoBehaviour:
   nextTurnButton: {fileID: 1666548856}
   cardPrefab: {fileID: 1031228733670223655, guid: a5b0d87ca8a57054d9b7a276d6c2bd29, type: 3}
   cardSpacing: 150
+  gameplayPanel: {fileID: 510192894}
   roomPanel: {fileID: 602643886}
   roomIdInputField: {fileID: 1654577503}
   createRoomButton: {fileID: 1926354098}
@@ -1481,7 +1483,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 23
 --- !u!114 &510192896
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1778,7 +1780,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &602643887
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3087,7 +3089,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_TargetDisplay: 0
 --- !u!1 &1516628192
 GameObject:
@@ -4601,7 +4603,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &2014386825
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4660,10 +4662,10 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
-  m_AdditionalShaderChannelsFlag: 25
+  m_AdditionalShaderChannelsFlag: -1
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_TargetDisplay: 0
 --- !u!224 &2014386828
 RectTransform:
@@ -5359,12 +5361,12 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 519420032}
-  - {fileID: 510192898}
   - {fileID: 2014386828}
+  - {fileID: 510192898}
   - {fileID: 1571675067}
-  - {fileID: 53342242}
   - {fileID: 1509179305}
   - {fileID: 743193446}
+  - {fileID: 53342242}
   - {fileID: 1646173300}
   - {fileID: 316774225}
   - {fileID: 153854931}

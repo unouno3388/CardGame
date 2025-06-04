@@ -137,9 +137,14 @@ public class WebSocketManager : MonoBehaviour
         Debug.Log("Handling message from server: " + jsonMessage);
         try
         {
+            Debug.Log($"[PlayerB-WSM] Received raw msg: {jsonMessage}");
             // 使用 Newtonsoft.Json 反序列化 GameMessage 本身
             GameMessage baseMessage = JsonConvert.DeserializeObject<GameMessage>(jsonMessage);
-
+            if (baseMessage.type == "roomUpdate")
+            {
+                ServerRoomState roomStateForLog = JsonConvert.DeserializeObject<ServerRoomState>(baseMessage.data.ToString());
+                Debug.Log($"[PlayerB-WSM] Parsed roomUpdate: gameStarted={roomStateForLog.gameStarted}, selfId={roomStateForLog.self?.playerId}, opponentId={roomStateForLog.opponent?.playerId}, currentPlayerId={roomStateForLog.currentPlayerId}");
+            }
             if (baseMessage == null || string.IsNullOrEmpty(baseMessage.type))
             {
                 Debug.LogError("Failed to parse base GameMessage or type is missing.");
@@ -210,24 +215,32 @@ public class WebSocketManager : MonoBehaviour
     }
 
     // 【新增】發送創建房間請求
-    public async void SendCreateRoomRequest(string playerName) {
-        if (ws != null && ws.State == WebSocketState.Open) {
-            GameMessage message = new GameMessage {
+    public async void SendCreateRoomRequest(string playerName)
+    {
+        if (ws != null && ws.State == WebSocketState.Open)
+        {
+            GameMessage message = new GameMessage
+            {
                 type = "createRoom",
                 playerId = playerName // 或者 GameManager.Instance.PlayerId (如果PlayerId代表名稱或唯一標識)
             };
             string json = JsonConvert.SerializeObject(message);
             await ws.SendText(json);
             Debug.Log($"Sent createRoom request: {json}");
-        } else {
+        }
+        else
+        {
             Debug.LogWarning("WebSocket is not connected. Cannot send createRoom request.");
         }
     }
 
     // 【新增】發送加入房間請求
-    public async void SendJoinRoomRequest(string targetRoomId, string playerName) {
-        if (ws != null && ws.State == WebSocketState.Open) {
-            GameMessage message = new GameMessage {
+    public async void SendJoinRoomRequest(string targetRoomId, string playerName)
+    {
+        if (ws != null && ws.State == WebSocketState.Open)
+        {
+            GameMessage message = new GameMessage
+            {
                 type = "joinRoom",
                 roomId = targetRoomId,
                 playerId = playerName // 或者 GameManager.Instance.PlayerId
@@ -235,14 +248,19 @@ public class WebSocketManager : MonoBehaviour
             string json = JsonConvert.SerializeObject(message);
             await ws.SendText(json);
             Debug.Log($"Sent joinRoom request: {json}");
-        } else {
+        }
+        else
+        {
             Debug.LogWarning("WebSocket is not connected. Cannot send joinRoom request.");
         }
     }
-     // 【新增】發送離開房間請求
-    public async void SendLeaveRoomRequest(string currentRoomId) {
-        if (ws != null && ws.State == WebSocketState.Open) {
-            GameMessage message = new GameMessage {
+    // 【新增】發送離開房間請求
+    public async void SendLeaveRoomRequest(string currentRoomId)
+    {
+        if (ws != null && ws.State == WebSocketState.Open)
+        {
+            GameMessage message = new GameMessage
+            {
                 type = "leaveRoom",
                 roomId = currentRoomId,
                 playerId = GameManager.Instance.PlayerId
@@ -250,23 +268,26 @@ public class WebSocketManager : MonoBehaviour
             string json = JsonConvert.SerializeObject(message);
             await ws.SendText(json);
             Debug.Log($"Sent leaveRoom request: {json}");
-        } else {
+        }
+        else
+        {
             Debug.LogWarning("WebSocket is not connected. Cannot send leaveRoom request.");
         }
     }
 
-    public bool IsConnected() {
+    public bool IsConnected()
+    {
         return ws != null && ws.State == WebSocketState.Open;
     }
 
     void Update()
     {
-        #if !UNITY_WEBGL || UNITY_EDITOR // DispatchMessageQueue 在 WebGL 上是自動的
+#if !UNITY_WEBGL || UNITY_EDITOR // DispatchMessageQueue 在 WebGL 上是自動的
         if (ws != null)
         {
             ws.DispatchMessageQueue();
         }
-        #endif
+#endif
     }
 
     async void OnDestroy() // 【修改】使用 OnApplicationQuit 可能更合適，取決於物件生命週期
@@ -276,7 +297,7 @@ public class WebSocketManager : MonoBehaviour
 
     async void OnApplicationQuit() // 【新增】確保應用程式退出時關閉連接
     {
-       await CloseConnection();
+        await CloseConnection();
     }
 
     public async System.Threading.Tasks.Task CloseConnection() // 【新增】公共的關閉連接方法
