@@ -58,7 +58,7 @@ public class GameManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
+            //DontDestroyOnLoad(gameObject);
             Debug.LogWarning($"GameManager Awake: Instance {this.GetInstanceID()} is now THE singleton instance. TurnProcessor will be initialized on this instance.");
         }
         else
@@ -244,9 +244,12 @@ public class GameManager : MonoBehaviour
 
         // 重新獲取場景中可能改變的組件引用
         UIManager = FindObjectOfType<UIManager>(); //
+        Debug.Log($"UIManager found: {UIManager != null}");
         CardAnimationManager = FindObjectOfType<CardAnimationManager>();
         if (menuManager == null) menuManager = FindObjectOfType<MenuManager>(); //
-
+        if (aiManager == null) aiManager = GetComponent<AIManager>(); //
+        if (WebSocketManager == null) WebSocketManager = GetComponent<WebSocketManager>(); //
+        if (CardPlayService == null) CardPlayService = gameObject.AddComponent<CardPlayService>(); //
         // 確保服務依賴更新
         GameOverHandler.InitializeDependencies(this, menuManager, UIManager, CardAnimationManager, CurrentState);
         TurnProcessor.InitializeDependencies(this, CurrentState, aiManager, WebSocketManager, UIManager);
@@ -403,7 +406,13 @@ public class GameManager : MonoBehaviour
             Time.timeScale = 1; // 確保非遊戲結束時時間正常
         }
     }
-
+    /// <summary>
+    /// 處理來自伺服器的房間更新。
+    /// 這個方法會更新遊戲狀態，並根據遊戲是否開始或結束來調整 UI。
+    /// 如果遊戲已開始且未結束，則顯示遊戲畫面；如果遊戲未開始，則顯示房間面板。
+    /// 如果遊戲結束，則處理遊戲結束邏輯。
+    /// </summary>
+    /// <param name="roomState"></param>
     public void HandleRoomUpdateFromServer(ServerRoomState roomState) //
     {
         Debug.Log($"GameManager: Handling RoomUpdateFromServer. Room: {roomState.roomId}, GameStarted: {roomState.gameStarted}, GameOver: {roomState.gameOver}");

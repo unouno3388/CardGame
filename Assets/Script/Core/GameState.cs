@@ -29,7 +29,7 @@ public class GameState : IGameState
     {
         CurrentGameMode = mode;
         PlayerHealth = 30; // 根據 GameManager.InitializeGameDefaults 調整
-        OpponentHealth = 10;
+        OpponentHealth = 1;
         PlayerMana = 10;
         MaxMana = 10;
         OpponentMana = 1;

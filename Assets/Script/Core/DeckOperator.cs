@@ -45,7 +45,7 @@ public class DeckOperator : IDeckOperator
         List<Card> deck = new List<Card>();
         string[] cardNames = { "Fireball", "Ice Blast", "Thunder Strike", "Heal Wave", "Shadow Bolt", "Light Heal", "Flame Slash", "Frost Shield" };
         string[] effects = { "Deal", "Heal" };
-        string[] cardTypes = { "Spell", "Minion" }; // 假設有這些類型
+        string[] cardTypes = { "Spell", /*"Minion" */}; // 假設有這些類型
 
         for (int i = 0; i < count; i++)
         {

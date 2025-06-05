@@ -117,7 +117,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             }
             if (nameText != null) { nameText.text = cardData.name; nameText.gameObject.SetActive(true); }
             if (costText != null) { costText.text = "Cost"+cardData.cost.ToString(); costText.gameObject.SetActive(true); }
-            if (descriptionText != null) { descriptionText.text = cardData.effect; descriptionText.gameObject.SetActive(true); }
+            if (descriptionText != null) { descriptionText.text = cardData.effect; descriptionText.gameObject.SetActive(false); }
             if (attackText != null) {
                 if (cardData.attack > 0) { attackText.text = "ATK"+cardData.attack.ToString(); attackText.gameObject.SetActive(true); }
                 else { attackText.gameObject.SetActive(false); }
@@ -218,13 +218,18 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             //transform.DOMoveY(originalPosition.y + 2f, 0.5f).SetEase(Ease.OutQuad);
         }
     }
-
+    /// <summary>
+    /// 當滑鼠指針離開卡牌時觸發。
+    /// 這裡會將卡牌縮放回原始大小。
+    /// 如果正在播放動畫，則不執行任何操作。
+    /// </summary>
+    /// <param name="eventData"></param>
     public void OnPointerExit(PointerEventData eventData)
     {
         // 複製您 CardUI.cs 中最新的 OnPointerExit 內容
-        if (!isFieldCard && isPlayerCard && artworkImage != null)  // artworkImage 是您在 CardUI 中定義的
+        if (!isFieldCard && isPlayerCard && artworkImage != null && !CardAnimationManager.Instance.IsAnimationPlaying())  // artworkImage 是您在 CardUI 中定義的
         {
-             Debug.Log("y = "+originalPosition.y );
+            Debug.Log("y = "+originalPosition.y );
             transform.DOScale(originalScale, 0.2f).SetEase(Ease.OutQuad);
             //transform.DOMoveY(originalPosition .y - 2f, 0.5f).SetEase(Ease.OutQuad);
         }

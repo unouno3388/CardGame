@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class CardPlayService : MonoBehaviour
 {
     private GameManager gameManager;
+    [SerializeField] // 【新增】允許在 Inspector 中設置 UIManager
     private UIManager uiManager;
 
     void Awake()

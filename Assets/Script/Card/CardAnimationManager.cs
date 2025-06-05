@@ -156,10 +156,12 @@ public class CardAnimationManager : MonoBehaviour
         }
 
         // 1. 放大效果
-        seq.Append(rect.DOScale(originalCardScale * enlargeScaleFactor, enlargeDuration).SetEase(enlargeEase).OnUpdate(() =>
-        {
-            if (cardObject == null) wasDestroyedDuringAnimation = true;
-        }));
+        if(!isPlayer) // 對手出牌時，先將卡牌放大到動畫層的大小(玩家已在CardUI中的滑鼠事件處理)
+            seq.Append(rect.DOScale(originalCardScale * enlargeScaleFactor, enlargeDuration).SetEase(enlargeEase).OnUpdate(() =>
+            {
+                Debug.Log($"{ (isPlayer ? "玩家":"對手") } 顯示出牌動畫.");
+                if (cardObject == null) wasDestroyedDuringAnimation = true;
+            }));
 
         // 2. 放大後停留
         if (postEnlargeHoldDuration > 0)
@@ -242,7 +244,7 @@ public class CardAnimationManager : MonoBehaviour
 
         seq.OnComplete(() =>
         {
-            onComplete?.Invoke(); //Onkill 會重複在執行一次
+            //onComplete?.Invoke(); //Onkill 會重複在執行一次
             if (!wasDestroyedDuringAnimation && cardObject != null)
             {
                 StartCoroutine(DestroyAfterFrame(cardObject));
