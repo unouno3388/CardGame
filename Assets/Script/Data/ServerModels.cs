@@ -5,7 +5,7 @@ using System.Collections.Generic;
 public class ServerGameState //
 {
     public string playerId;
-    //public int maxHealth;
+    public int maxHealth;
     public int playerHealth;
     public int playerMana;
     public int playerMaxMana;

@@ -158,7 +158,7 @@ public class UIManager : MonoBehaviour
 
         GameManager gm = GameManager.Instance;
 
-        if (playerHealthText != null) playerHealthText.text = "HP: " + gm.CurrentState.PlayerHealth;
+        if (playerHealthText != null) playerHealthText.text = "HP: " + gm.CurrentState.PlayerHealth + "/" + gm.CurrentState.MaxHealth;
         if (opponentHealthText != null) opponentHealthText.text = "HP: " + gm.CurrentState.OpponentHealth;
         if (playerManaText != null) playerManaText.text = "Mana: " + gm.CurrentState.PlayerMana + "/" + gm.CurrentState.MaxMana;
         if (playerHealthBar != null) playerHealthBar.fillAmount = gm.CurrentState.PlayerHealth / 30f;//(float)gm.maxHealth;

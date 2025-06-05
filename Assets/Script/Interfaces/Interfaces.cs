@@ -8,6 +8,7 @@ using UnityEngine; // 為了 Coroutine
 public interface IGameState
 {
     // 屬性
+    int MaxHealth { get; set; }
     int PlayerHealth { get; set; }
     int OpponentHealth { get; set; }
     int PlayerMana { get; set; }

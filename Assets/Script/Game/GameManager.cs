@@ -200,9 +200,11 @@ public class GameManager : MonoBehaviour
         // 假設 WebSocketManager 傳遞的是 GameMessage.data 部分
         WebSocketManager.RegisterMessageHandler("roomCreated", (data) =>
         { //
-            // 我們需要從 data (object) 重建成 GameMessage 才能獲取 roomId, playerId 等頂層欄位
-            // 這是原始 GameManager 中的權宜之計。理想情況下，WebSocketManager 應該傳遞整個 GameMessage。
+          // 我們需要從 data (object) 重建成 GameMessage 才能獲取 roomId, playerId 等頂層欄位
+          // 這是原始 GameManager 中的權宜之計。理想情況下，WebSocketManager 應該傳遞整個 GameMessage。
+            
             var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); //
+            Debug.LogWarning($"GameManager: Handling roomCreated message with data: {JsonConvert.SerializeObject(data)}"); //
             RoomActionHandler.HandleRoomCreatedResponse(gameMessage); //
         });
         WebSocketManager.RegisterMessageHandler("roomJoined", (data) =>

@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class GameState : IGameState
 {
+    public int MaxHealth { get; set; } // 假設最大生命值為 30
     public int PlayerHealth { get; set; }
     public int OpponentHealth { get; set; }
     public int PlayerMana { get; set; }
@@ -56,6 +57,7 @@ public class GameState : IGameState
     public void UpdateFromGameStartServer(ServerGameState initialState, IDataConverter converter, UIManager uiManager)
     {
         PlayerId = initialState.playerId;
+        MaxHealth = initialState.maxHealth; // 假設 ServerGameState 有 maxHealth 欄位
         PlayerHealth = initialState.playerHealth;
         OpponentHealth = initialState.aiHealth; // AI 模式
         PlayerMana = initialState.playerMana;

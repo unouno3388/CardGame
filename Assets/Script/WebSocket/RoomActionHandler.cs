@@ -67,6 +67,8 @@ public class RoomActionHandler : IRoomActionHandler
     // In RoomActionHandler.cs
     public void HandleRoomCreatedResponse(GameMessage message)
     {
+        Debug.Log("RoomID: " + message.roomId);
+        Debug.Log("PlayerID: " + message.playerId);
         Debug.Log($"RoomActionHandler: Room created response. RoomID: {message.roomId}, PlayerID: {message.playerId}, Server Message: {message.message}");
         // message.data 來自伺服器 roomCreatedMsg.setData(Map.of("message", "房間創建成功！房間號：" + newRoom.getId()))
         // message.roomId 和 message.playerId 來自 GameMessage 的頂層字段
