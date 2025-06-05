@@ -214,7 +214,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler,
             GameManager.Instance != null && GameManager.Instance.CurrentState.IsPlayerTurn)
         {
             Debug.Log("y = "+originalPosition.y + 1f);
-            transform.DOScale(originalScale * 1.5f, 0.2f).SetEase(Ease.OutQuad);
+            transform.DOScale(originalScale * CardAnimationManager.Instance.enlargeScaleFactor, 0.2f).SetEase(Ease.OutQuad);
             //transform.DOMoveY(originalPosition.y + 2f, 0.5f).SetEase(Ease.OutQuad);
         }
     }

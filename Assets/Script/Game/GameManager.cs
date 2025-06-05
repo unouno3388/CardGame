@@ -236,7 +236,7 @@ public class GameManager : MonoBehaviour
             }
         });
     }
-
+    
     void OnGameSceneLoaded() // 原 OnSceneLoaded
     {
         Debug.Log($"Current Time.timeScale: {Time.timeScale} at {this.GetType().Name}");
@@ -327,6 +327,7 @@ public class GameManager : MonoBehaviour
         if (UIManager != null) UIManager.UpdateUI(); //
     }
 
+    #region 離線模式功能函數區
     void InitializeOfflineGame()
     {
         CurrentState.PlayerDeck.AddRange(DeckOperator.GenerateRandomDeck(30)); //
@@ -362,7 +363,7 @@ public class GameManager : MonoBehaviour
     {
         TurnProcessor.EndAITurnOffline();
     }
-
+    #endregion
 
     public void HandleGameStartFromServer(ServerGameState initialState) //
     {

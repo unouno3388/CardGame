@@ -3,7 +3,8 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using DG.Tweening; // 如果還在使用 DOTween
 using System.Collections;
-using System.Linq; // 【新增】
+using System.Linq;
+using TMPro; // 【新增】
 
 public class UIManager : MonoBehaviour
 {
@@ -14,12 +15,15 @@ public class UIManager : MonoBehaviour
     public Transform playerFieldPanel;
     public Transform opponentFieldPanel;
     [Header("數值與訊息面板")]
-    public Text playerHealthText;
-    public Text opponentHealthText;
+    //public Text playerHealthText;
+    public TextMeshProUGUI playerHealthText;
+    //public Text opponentHealthText;
+    public TextMeshProUGUI opponentHealthText;
     public Text playerManaText;
     public Text opponentManaText; // 【新增】如果需要顯示對手（AI）的法力
     public Text gameOverText;
     public Image playerHealthBar; // 玩家生命條
+    public Image playerManaBar; // 玩家法力條
     public Image opponentHealthBar; // 對手生命條
     [Header("下回合按鈕")]
     public Button nextTurnButton; // 下一回合按鈕
@@ -27,7 +31,7 @@ public class UIManager : MonoBehaviour
     public GameObject cardPrefab;
     [Header("卡牌間距")]
     public float cardSpacing = 10f;
-    [Header("房間系統 UI 元素引用")]
+    [Header("房間畫面 UI 元素")]
     // 【新增】房間 UI 元素引用
     public GameObject gameplayPanel; // 遊戲進行中的面板
     public GameObject roomPanel; // 整個房間控制面板
@@ -154,10 +158,11 @@ public class UIManager : MonoBehaviour
 
         GameManager gm = GameManager.Instance;
 
-        if (playerHealthText != null) playerHealthText.text = "玩家生命: " + gm.CurrentState.PlayerHealth;
-        if (opponentHealthText != null) opponentHealthText.text = "對手生命: " + gm.CurrentState.OpponentHealth;
-        if (playerManaText != null) playerManaText.text = "法力: " + gm.CurrentState.PlayerMana + "/" + gm.CurrentState.MaxMana;
+        if (playerHealthText != null) playerHealthText.text = "HP: " + gm.CurrentState.PlayerHealth;
+        if (opponentHealthText != null) opponentHealthText.text = "HP: " + gm.CurrentState.OpponentHealth;
+        if (playerManaText != null) playerManaText.text = "Mana: " + gm.CurrentState.PlayerMana + "/" + gm.CurrentState.MaxMana;
         if (playerHealthBar != null) playerHealthBar.fillAmount = gm.CurrentState.PlayerHealth / 30f;//(float)gm.maxHealth;
+        if (playerManaBar != null) playerManaBar.fillAmount = gm.CurrentState.PlayerMana / (float)gm.CurrentState.MaxMana; // 玩家法力條
         if (opponentHealthBar != null) opponentHealthBar.fillAmount = gm.CurrentState.OpponentHealth / 30f;//(float)gm.maxHealth;
         // 【新增】顯示對手（AI或線上玩家）的法力（如果遊戲設計如此）
         if (opponentManaText != null)
@@ -301,7 +306,7 @@ public class UIManager : MonoBehaviour
                 // CardUI.Initialize 方法需要能處理 cardData 為 null 或 cardData.sprite 為 null 的情況，並顯示卡背
                 cardUI.Initialize(new Card { name = "OpponentCardBack" }, false, false); // isPlayer=false, isField=false
             }
-             else
+            else
             {
                 Debug.LogError("[UIManager] Prefab for card back is missing CardUI component.");
                 Destroy(cardBackObj); // 避免空引用

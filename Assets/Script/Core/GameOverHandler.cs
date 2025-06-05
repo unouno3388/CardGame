@@ -17,7 +17,8 @@ public class GameOverHandler : IGameOverHandler
     private Coroutine _gameOverDisplayCoroutine = null;
 
     public bool IsGameOverSequenceRunning => _isGameOverSequenceRunning;
-
+    const string Win_Message = "You Win!";
+    const string Lose_Message = "You Lose!";
     public void InitializeDependencies(GameManager gameManager, MenuManager menuManager, UIManager uiManager, CardAnimationManager cardAnimationManager, IGameState gameState)
     {
         _gameManager = gameManager;
@@ -54,13 +55,13 @@ public class GameOverHandler : IGameOverHandler
         if (_gameState.PlayerHealth <= 0)
         {
             playerWon = false;
-            message = "你輸了!";
+            message = Lose_Message;
             gameEnded = true;
         }
         else if (_gameState.OpponentHealth <= 0)
         {
             playerWon = true;
-            message = "你贏了!";
+            message = Win_Message;
             gameEnded = true;
         }
         // 可以加入牌庫抽乾的判斷
@@ -93,7 +94,7 @@ public class GameOverHandler : IGameOverHandler
         if (_gameState.CurrentGameMode == GameManager.GameMode.OnlineSinglePlayerAI)
         {
             _pendingPlayerWon = (updatedState.winner == "Player"); // 後端定義 "Player" 為玩家贏
-            _pendingGameOverMessage = _pendingPlayerWon ? "你贏了!" : "你輸了!";
+            _pendingGameOverMessage = _pendingPlayerWon ? Win_Message : Lose_Message;
             if (string.IsNullOrEmpty(updatedState.winner) && updatedState.gameStarted)
             {
                  _pendingGameOverMessage = "遊戲結束 (AI模式)";
@@ -103,7 +104,7 @@ public class GameOverHandler : IGameOverHandler
         {
             // 在房間模式，GameManager 會傳入自己的 PlayerId (localPlayerId)
             _pendingPlayerWon = (updatedState.winner == localPlayerId);
-            _pendingGameOverMessage = _pendingPlayerWon ? "你贏了!" : "你輸了!";
+            _pendingGameOverMessage = _pendingPlayerWon ? Win_Message : Lose_Message;
             if (string.IsNullOrEmpty(updatedState.winner) && updatedState.gameStarted)
             {
                 _pendingGameOverMessage = "遊戲結束 (房間模式)";

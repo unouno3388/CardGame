@@ -14,7 +14,11 @@ public class DeckOperator : IDeckOperator
         _uiManager = uiManager;
         _gameOverHandler = gameOverHandler;
     }
-
+    /// <summary>
+    /// 離線模式下的發牌函數
+    /// </summary>
+    /// <param name="isPlayer"></param>
+    /// <param name="count"></param>
     public void DrawCardLocal(bool isPlayer, int count)
     {
         List<Card> deck = isPlayer ? _gameState.PlayerDeck : _gameState.OpponentDeck;
