@@ -4,8 +4,8 @@ using System; // 【新增】為了 Action
 using System.Collections.Generic; // 【新增】為了 Dictionary
 using Newtonsoft.Json; // 【新增】或者使用 Unity 的 JsonUtility，但 Newtonsoft 更強大，需要匯入對應的 DLL 或透過 Package Manager 安裝
 // 如果使用 JsonUtility，則 GameMessage 和其嵌套類別需要是 [System.Serializable] 且欄位都是 public
-public delegate void MessageHandlerDelegate(object data);
-//public delegate void MessageHandlerDelegate(GameMessage message);
+//public delegate void MessageHandlerDelegate(object data);
+public delegate void MessageHandlerDelegate(GameMessage message);
 public class WebSocketManager : MonoBehaviour
 {
     private WebSocket ws;
@@ -156,7 +156,8 @@ public class WebSocketManager : MonoBehaviour
             {
                 // baseMessage.data 已經是 object 類型，可以直接傳遞
                 // 處理函式內部需要負責將 object data 轉換為預期的具體類型
-                handler.Invoke(baseMessage.data);
+                //handler.Invoke(baseMessage.data);
+                handler.Invoke(baseMessage);
             }
             else
             {

@@ -138,24 +138,25 @@ public class GameManager : MonoBehaviour
     {
         if (WebSocketManager == null) return;
 
-        WebSocketManager.RegisterMessageHandler("gameStart", (data) => //
+        WebSocketManager.RegisterMessageHandler("gameStart", (message) => //
         {
-            ServerGameState gameStartState = JsonConvert.DeserializeObject<ServerGameState>(data.ToString()); //
+            ServerGameState gameStartState = JsonConvert.DeserializeObject<ServerGameState>(message.data.ToString()); //
             HandleGameStartFromServer(gameStartState);
         });
-        WebSocketManager.RegisterMessageHandler("gameStateUpdate", (data) => //
+        WebSocketManager.RegisterMessageHandler("gameStateUpdate", (message) => //
         {
-            ServerGameState gameState = JsonConvert.DeserializeObject<ServerGameState>(data.ToString()); //
+            ServerGameState gameState = JsonConvert.DeserializeObject<ServerGameState>(message.data.ToString()); //
             HandleGameStateUpdateFromServer(gameState);
         });
-        WebSocketManager.RegisterMessageHandler("roomUpdate", (data) => //
+        WebSocketManager.RegisterMessageHandler("roomUpdate", (message) => //
         {
-            ServerRoomState roomState = JsonConvert.DeserializeObject<ServerRoomState>(data.ToString()); //
+            ServerRoomState roomState = JsonConvert.DeserializeObject<ServerRoomState>(message.data.ToString()); //
+            Debug.Log($"GameManager: Received roomUpdate message with data: {JsonConvert.SerializeObject(message.data)}"); //
             HandleRoomUpdateFromServer(roomState);
         });
-        WebSocketManager.RegisterMessageHandler("aiAction", (data) => //
+        WebSocketManager.RegisterMessageHandler("aiAction", (message) => //
         {
-            var aiActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            var aiActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(message.data.ToString()); //
             if (aiActionData.TryGetValue("actionType", out object aiActionType) && aiActionType.ToString() == "playCard") //
             {
                 if (aiActionData.TryGetValue("card", out object cardObj)) //
@@ -165,16 +166,16 @@ public class GameManager : MonoBehaviour
                 }
             }
         });
-        WebSocketManager.RegisterMessageHandler("opponentPlayCard", (data) => //
+        WebSocketManager.RegisterMessageHandler("opponentPlayCard", (message) => //
         {
             // 假設 data 是一個 JSON 字串，代表包含 "card" 和 "playerName" 的物件
-            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); // 有點繞，但如果data就是GameMessage.data的內容
+            var eventData = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(message.data)); // 有點繞，但如果data就是GameMessage.data的內容
             // 或者，如果 data 就是 GameMessage 本身（修改委派）
             // ServerCard playedCard = JsonConvert.DeserializeObject<ServerCard>(eventData.data.ToString()); // 如果 card 在 data.data 裡
             // string playerName = eventData.playerId; // 如果 playerName 是 GameMessage.playerId
 
             // 假設 data 包含 card (ServerCard) 和 playerName
-            var opponentPlayData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            var opponentPlayData = JsonConvert.DeserializeObject<Dictionary<string, object>>(message.data.ToString()); //
             if (opponentPlayData.TryGetValue("card", out object cardData) && //
                 opponentPlayData.TryGetValue("playerName", out object playerNameObj)) //
             {
@@ -198,35 +199,36 @@ public class GameManager : MonoBehaviour
         // wsManager.RegisterMessageHandler("roomCreated", RoomActionHandler.HandleRoomCreatedResponse);
 
         // 假設 WebSocketManager 傳遞的是 GameMessage.data 部分
-        WebSocketManager.RegisterMessageHandler("roomCreated", (data) =>
+        WebSocketManager.RegisterMessageHandler("roomCreated", (message) =>
         { //
           // 我們需要從 data (object) 重建成 GameMessage 才能獲取 roomId, playerId 等頂層欄位
           // 這是原始 GameManager 中的權宜之計。理想情況下，WebSocketManager 應該傳遞整個 GameMessage。
-            
-            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); //
-            Debug.LogWarning($"GameManager: Handling roomCreated message with data: {JsonConvert.SerializeObject(data)}"); //
+
+            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(message)); //
+            Debug.LogWarning($"GameManager: Handling roomCreated message with data: {JsonConvert.SerializeObject(message)}"); //
             RoomActionHandler.HandleRoomCreatedResponse(gameMessage); //
+            Debug.LogWarning($"GameManager: Handled roomCreated message with roomId: {CurrentState.RoomId}, playerId: {CurrentState.PlayerId}"); //
         });
-        WebSocketManager.RegisterMessageHandler("roomJoined", (data) =>
+        WebSocketManager.RegisterMessageHandler("roomJoined", (message) =>
         { //
-            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); //
+            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(message.data)); //
             RoomActionHandler.HandleRoomJoinedResponse(gameMessage); //
         });
-        WebSocketManager.RegisterMessageHandler("leftRoom", (data) =>
+        WebSocketManager.RegisterMessageHandler("leftRoom", (message) =>
         { //
-            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); //
+            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(message.data)); //
             RoomActionHandler.HandleLeftRoomResponse(gameMessage); //
         });
-        WebSocketManager.RegisterMessageHandler("error", (data) =>
+        WebSocketManager.RegisterMessageHandler("error", (message) =>
         { //
-            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(data)); //
+            var gameMessage = JsonConvert.DeserializeObject<GameMessage>(JsonConvert.SerializeObject(message.data)); //
             RoomActionHandler.HandleErrorResponse(gameMessage); //
         });
 
 
-        WebSocketManager.RegisterMessageHandler("playerAction", (data) => //
+        WebSocketManager.RegisterMessageHandler("playerAction", (message) => //
         {
-            var playerActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(data.ToString()); //
+            var playerActionData = JsonConvert.DeserializeObject<Dictionary<string, object>>(message.data.ToString()); //
             if (playerActionData.TryGetValue("action", out object playerActionType) && playerActionType.ToString() == "playCard" && //
                 playerActionData.TryGetValue("success", out object successObj) && (bool)successObj == true) //
             {

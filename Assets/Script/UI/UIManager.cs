@@ -158,7 +158,7 @@ public class UIManager : MonoBehaviour
 
         GameManager gm = GameManager.Instance;
 
-        if (playerHealthText != null) playerHealthText.text = "HP: " + gm.CurrentState.PlayerHealth + "/" + gm.CurrentState.MaxHealth;
+        if (playerHealthText != null) playerHealthText.text = "HP: " + gm.CurrentState.PlayerHealth+ "/" + gm.CurrentState.MaxHealth;
         if (opponentHealthText != null) opponentHealthText.text = "HP: " + gm.CurrentState.OpponentHealth;
         if (playerManaText != null) playerManaText.text = "Mana: " + gm.CurrentState.PlayerMana + "/" + gm.CurrentState.MaxMana;
         if (playerHealthBar != null) playerHealthBar.fillAmount = gm.CurrentState.PlayerHealth / 30f;//(float)gm.maxHealth;
@@ -522,7 +522,13 @@ public class UIManager : MonoBehaviour
         if (roomStatusText != null)
         {
             roomStatusText.text = status;
+            Debug.Log($"[UIManager] UpdateRoomStatus: {status}");
         }
+        if (status == null)
+        {
+            roomIdInputField.text = GameManager.Instance.CurrentState.RoomId; // 清空房間ID輸入框
+        }
+        //Debug.LogWarning($"[UIManager] OnCreateRoomClicked: Current RoomId: {GameManager.Instance.CurrentState.RoomId} + Status: {status}");
     }
 
     // 切換創建/加入按鈕的可用性
@@ -530,7 +536,7 @@ public class UIManager : MonoBehaviour
     {
         if (createRoomButton != null) createRoomButton.gameObject.SetActive(showJoinCreate);
         if (joinRoomButton != null) joinRoomButton.gameObject.SetActive(showJoinCreate);
-        if (roomIdInputField != null) roomIdInputField.gameObject.SetActive(showJoinCreate);
+        //if (roomIdInputField != null) roomIdInputField.gameObject.SetActive(showJoinCreate);
     }
 
 
@@ -539,6 +545,9 @@ public class UIManager : MonoBehaviour
         // 這裡可以讓玩家輸入自己的名字，或者使用 GameManager.Instance.PlayerId (如果它是代表玩家名)
         // 為了簡單，我們暫時不處理玩家名輸入
         GameManager.Instance.RequestCreateRoom(GameManager.Instance.PlayerId ?? "玩家");
+        //Debug.Log($"[UIManager] OnCreateRoomClicked: Requesting room creation with PlayerId: {GameManager.Instance.PlayerId}");
+        Debug.Log($"[UIManager] OnCreateRoomClicked: Current RoomId: {GameManager.Instance.CurrentState.RoomId}");
+
         UpdateRoomStatus("正在創建房間...");
         ToggleRoomJoinCreateButtons(false); // 點擊後暫時隱藏，等待伺服器回應
     }

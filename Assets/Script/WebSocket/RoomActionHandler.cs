@@ -74,6 +74,7 @@ public class RoomActionHandler : IRoomActionHandler
         // message.roomId 和 message.playerId 來自 GameMessage 的頂層字段
 
         _gameState.RoomId = message.roomId; // 設定房間ID
+        Debug.Log($"RoomActionHandler: Setting GameState.RoomId to {_gameState.RoomId}");
         _gameState.IsInRoom = true;        // 標記玩家在房間內
         if (!string.IsNullOrEmpty(message.playerId)) // 如果伺服器在roomCreated時也返回了playerId，更新它
         {
