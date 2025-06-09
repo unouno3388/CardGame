@@ -174,7 +174,16 @@ public class GameState : IGameState
             PlayerHealth = roomState.self.health;
             PlayerMana = roomState.self.mana;
             MaxMana = roomState.self.maxMana;
-
+            if (roomState.self.maxHealth > 0) // 確保 maxHealth 有效
+            {
+                MaxHealth = roomState.self.maxHealth;
+                Debug.LogWarning($"[PlayerB-GS] Updated MaxHealth to {MaxHealth} from roomState.self.maxHealth for PlayerId: {this.PlayerId}.");
+            }
+            else
+            {
+                Debug.LogWarning($"[PlayerB-GS] roomState.self.maxHealth is invalid ({roomState.self.maxHealth}). Using default MaxHealth of 30.");
+                MaxHealth = roomState.self.health; // 或者其他預設值
+            }
             PlayerHand.Clear();
             if (roomState.self.hand != null)
             {

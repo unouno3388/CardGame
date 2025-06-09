@@ -123,7 +123,7 @@ public class GameOverHandler : IGameOverHandler
 
         _isGameOverSequenceRunning = true;
         _pendingPlayerWon = (roomState.winnerId == localPlayerId);
-        _pendingGameOverMessage = _pendingPlayerWon ? "你贏了!" : "你輸了!";
+        _pendingGameOverMessage = _pendingPlayerWon ? Win_Message : Lose_Message;
         if (string.IsNullOrEmpty(roomState.winnerId) && roomState.gameStarted)
         {
             _pendingGameOverMessage = "遊戲結束 (房間模式)";
