@@ -5,4 +5,4 @@
 
 下載前端壓縮包後 請使用Unity HUB 的"從硬碟新增" 選取Asset的頭資料夾(重要!!)
 
-Springboot的部分請使用Java21環境即可 源碼請至...
+Springboot的部分請使用Java21環境即可 源碼請至此倉庫下載https://github.com/unouno3388/CardGameServer
