@@ -13,6 +13,6 @@
 
 Unity Hub 下載連結https://unity.com/cn/download
 ### 後端
-Springboot的部分請安裝Java21環境即可https://www.oracle.com/tw/java/technologies/downloads/#java21
+Springboot環境的部分請安裝Java21環境即可https://www.oracle.com/tw/java/technologies/downloads/#java21
 
-源碼請至此倉庫下載：[https://github.com/unouno3388/CardGameServer](https://github.com/unouno3388/CardGameServer)
+Springboot源碼請至此倉庫下載：[https://github.com/unouno3388/CardGameServer](https://github.com/unouno3388/CardGameServer)
