@@ -1,2 +1,3 @@
 # CardGame
-第一次專案
+如需編譯請使用 Unity 2022 LTS 版本
+Springboot的部分請至...
